@@ -1,0 +1,37 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand"</a>
+    </div>
+</div>
+
+<RadzenPanelMenu Style="height: calc(100vh - 56px); overflow-y: auto;" ExpandMode="PanelMenuExpandMode.Single">
+    <br />
+    <!-- INICIO -->
+    <RadzenPanelMenuItem Icon="home" Text="Inicio" Path="administrador/inicio" />
+
+    <!-- USUARIOS -->
+    <RadzenPanelMenuItem Icon="people" Text="Usuarios">
+        <RadzenPanelMenuItem Text="Lista de Usuarios" Path="administrador/usuarios" Icon="list" />
+        <RadzenPanelMenuItem Text="Roles" Path="administrador/usuarios/roles" Icon="security" />
+    </RadzenPanelMenuItem>
+
+    <!-- PUBLICACIONES -->
+    <RadzenPanelMenuItem Icon="description" Text="Publicaciones">
+        <RadzenPanelMenuItem Text="Pendientes de Revisión" Path="administrador/publicaciones/pendientes" Icon="hourglass_empty" />
+        <RadzenPanelMenuItem Text="Cambios Solicitados" Path="administrador/publicaciones/cambios" Icon="history" />
+        <RadzenPanelMenuItem Text="Rechazadas" Path="administrador/publicaciones/rechazadas" Icon="cancel" />
+        <RadzenPanelMenuItem Text="Aprobadas" Path="administrador/publicaciones/aprobadas" Icon="check_circle" />
+        <RadzenPanelMenuItem Text="Todas" Path="administrador/publicaciones/todas" Icon="folder_open" />
+        <RadzenPanelMenuItem Text="Parámetros" Path="administrador/publicaciones/parametros" Icon="build" />
+    </RadzenPanelMenuItem>
+
+    <!-- ESTADÍSTICAS -->
+    <RadzenPanelMenuItem Icon="bar_chart" Text="Estadísticas" Path="administrador/estadisticas" />
+
+    <!-- ACTIVIDAD DEL PORTAL -->
+    <RadzenPanelMenuItem Icon="notifications" Text="Actividad del portal">
+        <RadzenPanelMenuItem Text="Interacciones" Path="administrador/actividad/interacciones" Icon="touch_app" />
+        <RadzenPanelMenuItem Text="Notificaciones" Path="administrador/actividad/notificaciones" Icon="notifications_active" />
+    </RadzenPanelMenuItem>
+
+</RadzenPanelMenu>

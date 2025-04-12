@@ -1,0 +1,321 @@
+﻿@page "/administrador/usuarios"
+@using DAL.Modelos
+@using DAL.Consumo
+@using System.Text.Json
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<div class="container-fluid">
+    <h3 class="mb-4">Gestión de Usuarios</h3>
+
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <RadzenTextBox Placeholder="Buscar usuario por nombre o correo..."
+                           @bind-Value="@terminoBusqueda"
+                           Change="@RealizarBusqueda"
+                           Style="width: 100%;" />
+        </div>
+        <div class="col-md-2">
+            <RadzenDropDown TValue="string"
+                            @bind-Value="@filtroRol"
+                            Data="@roles"
+                            Change="@FiltrarPorRol"
+                            Style="width: 100%;"
+                            Placeholder="Filtrar por rol" />
+        </div>
+        <div class="col-md-2">
+            <RadzenButton Icon="add" Text="Nuevo Usuario"
+                          ButtonStyle="ButtonStyle.Success"
+                          Click="@AbrirModalNuevoUsuario"
+                          Style="width: 100%;" />
+        </div>
+    </div>
+
+    @if (cargando)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Primary" Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+    else if (error)
+    {
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">Error al cargar usuarios</h4>
+            <p>@mensajeError</p>
+            <hr>
+            <RadzenButton Text="Reintentar" Click="@CargarUsuarios" ButtonStyle="ButtonStyle.Secondary" />
+        </div>
+    }
+    else if (usuariosFiltrados == null || !usuariosFiltrados.Any())
+    {
+        <div class="alert alert-info" role="alert">
+            <h4 class="alert-heading">Sin resultados</h4>
+            <p>No se encontraron usuarios que coincidan con los criterios de búsqueda.</p>
+        </div>
+    }
+    else
+    {
+        <RadzenCard>
+            <RadzenDataGrid Data="@usuariosFiltrados" TItem="UsuarioListado" AllowFiltering="false"
+                            AllowColumnResize="true" AllowAlternatingRows="true" AllowSorting="true"
+                            PageSize="10" AllowPaging="true" PagerHorizontalAlign="HorizontalAlign.Center">
+                <Columns>
+                    <RadzenDataGridColumn TItem="UsuarioListado" Property="FotoPerfil" Title="Foto" Width="80px" Sortable="false" Filterable="false">
+                        <Template Context="usuario">
+                            <RadzenImage Path="@(string.IsNullOrEmpty(usuario.FotoPerfil) ? "/img/default-avatar.png" : usuario.FotoPerfil)"
+                                         Style="width: 40px; height: 40px; border-radius: 50%;" />
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="UsuarioListado" Property="Nombre" Title="Nombre" Width="180px">
+                        <Template Context="usuario">
+                            <div>
+                                <strong>@usuario.Nombre</strong>
+                                <div class="small text-muted">@usuario.Nombramiento</div>
+                            </div>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="UsuarioListado" Property="Correo" Title="Correo" Width="180px" />
+
+                    <RadzenDataGridColumn TItem="UsuarioListado" Property="Rol" Title="Rol" Width="120px">
+                        <Template Context="usuario">
+                            <RadzenBadge BadgeStyle="@ObtenerEstiloPorRol(usuario.Rol)" Text="@usuario.Rol.ToUpper()" />
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="UsuarioListado" Property="Estadisticas" Title="Publicaciones" Width="150px">
+                        <Template Context="usuario">
+                            <div>
+                                <div>Total: @usuario.Estadisticas.Publicaciones.TotalPublicaciones</div>
+                                <div class="small text-success">Publicadas: @usuario.Estadisticas.Publicaciones.Publicadas</div>
+                                <div class="small text-warning">En revisión: @usuario.Estadisticas.Publicaciones.EnRevision</div>
+                            </div>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="UsuarioListado" Property="FechaCreacion" Title="Registro" Width="120px">
+                        <Template Context="usuario">
+                            @usuario.FechaCreacion.ToString("dd/MM/yyyy")
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="UsuarioListado" Property="UltimoAcceso" Title="Último acceso" Width="120px">
+                        <Template Context="usuario">
+                            @{
+                                // DateTime.MinValue suele ser el valor por defecto cuando el JSON contiene null
+                                bool tieneUltimoAcceso = usuario.UltimoAcceso != null;
+                            }
+
+                            @if (tieneUltimoAcceso)
+                            {
+                                @usuario.UltimoAcceso;
+                            }
+                            else
+                            {
+                                <span class="text-muted">No disponible</span>
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+
+
+                    <RadzenDataGridColumn TItem="UsuarioListado" Title="Acciones" Width="180px" Sortable="false" Filterable="false">
+                        <Template Context="usuario">
+                            <RadzenButton Icon="person" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
+                                          Click="@(() => VerDetallesUsuario(usuario.IdUsuario))"
+                                          Variant="Variant.Flat" Title="Ver detalles" />
+
+                            <RadzenButton Icon="key" ButtonStyle="ButtonStyle.Warning" Size="ButtonSize.Small"
+                                          Click="@(() => AbrirModalResetearContrasena(usuario))"
+                                          Variant="Variant.Flat" Title="Resetear contraseña" />
+
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenCard>
+    }
+</div>
+
+@code {
+    // Variables para gestionar los datos y el estado
+    private List<UsuarioListado> usuarios;
+    private List<UsuarioListado> usuariosFiltrados;
+    private bool cargando = true;
+    private bool error = false;
+    private string mensajeError = string.Empty;
+
+    // Variables para filtrado y búsqueda
+    private string terminoBusqueda = string.Empty;
+    private string filtroRol = string.Empty;
+    private List<string> roles = new List<string> { "todos", "administrador", "moderador", "revisor", "usuario" };
+
+    // Método que se ejecuta al cargar el componente
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Inicializar el servicio de autenticación
+            await AuthService.InitializeAsync();
+            await CargarUsuarios();
+        }
+    }
+
+    /// <summary>
+    /// Carga la lista de usuarios desde la API
+    /// </summary>
+    private async Task CargarUsuarios()
+    {
+        cargando = true;
+        error = false;
+        StateHasChanged();
+
+        try
+        {
+            // Obtener el token de autenticación
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                // Redirigir al login si no hay sesión
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            // Consultar los usuarios utilizando nuestro servicio
+            usuarios = await gestionUsuarios.ObtenerListadoUsuariosAsync(token);
+
+            if (usuarios != null)
+            {
+                // Aplicar filtros iniciales
+                usuariosFiltrados = usuarios;
+                AplicarFiltros();
+            }
+            else
+            {
+                error = true;
+                mensajeError = "No se pudieron cargar los usuarios. Por favor, inténtelo de nuevo más tarde.";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = true;
+            mensajeError = $"Error al cargar usuarios: {ex.Message}";
+            Console.WriteLine($"Error en CargarUsuarios: {ex}");
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Aplica los filtros actuales (búsqueda por texto y rol)
+    /// </summary>
+    private void AplicarFiltros()
+    {
+        if (usuarios == null) return;
+
+        usuariosFiltrados = usuarios;
+
+        // Filtrar por término de búsqueda
+        if (!string.IsNullOrWhiteSpace(terminoBusqueda))
+        {
+            string termino = terminoBusqueda.ToLower();
+            usuariosFiltrados = usuariosFiltrados
+                .Where(u => u.Nombre.ToLower().Contains(termino) ||
+                           u.Correo.ToLower().Contains(termino) ||
+                           u.Nombramiento?.ToLower().Contains(termino) == true)
+                .ToList();
+        }
+
+        // Filtrar por rol
+        if (!string.IsNullOrWhiteSpace(filtroRol) && filtroRol != "todos")
+        {
+            usuariosFiltrados = usuariosFiltrados
+                .Where(u => u.Rol.ToLower() == filtroRol.ToLower())
+                .ToList();
+        }
+    }
+
+    /// <summary>
+    /// Realiza una búsqueda según el término ingresado
+    /// </summary>
+    private void RealizarBusqueda()
+    {
+        AplicarFiltros();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Filtra los usuarios por el rol seleccionado
+    /// </summary>
+    private void FiltrarPorRol()
+    {
+        AplicarFiltros();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Determina el estilo de badge según el rol del usuario
+    /// </summary>
+    private BadgeStyle ObtenerEstiloPorRol(string rol)
+    {
+        return rol.ToLower() switch
+        {
+            "administrador" => BadgeStyle.Danger,
+            "moderador" => BadgeStyle.Warning,
+            "revisor" => BadgeStyle.Success,
+            _ => BadgeStyle.Info
+        };
+    }
+
+    /// <summary>
+    /// Navega a la página de detalles del usuario
+    /// </summary>
+    private void VerDetallesUsuario(int idUsuario)
+    {
+        NavigationManager.NavigateTo($"/administrador/usuarios/{idUsuario}");
+    }
+
+
+
+    /// <summary>
+    /// Abre modal para resetear la contraseña de un usuario
+    /// </summary>
+    private async Task AbrirModalResetearContrasena(UsuarioListado usuario)
+    {
+        var resultado = await DialogService.OpenAsync<ResetearContrasenaDialog>("Resetear Contraseña",
+            new Dictionary<string, object>
+                    {
+                { "IdUsuario", usuario.IdUsuario },
+                { "NombreUsuario", usuario.Nombre }
+                    },
+            new DialogOptions { Width = "700px", Height = "500px", CloseDialogOnOverlayClick = false });
+
+        if (resultado != null && (bool)resultado == true)
+        {
+            NotificationService.Notify(NotificationSeverity.Success, "Éxito", "Contraseña restablecida correctamente");
+        }
+    }
+
+    /// <summary>
+    /// Abre modal para crear un nuevo usuario
+    /// </summary>
+    private async Task AbrirModalNuevoUsuario()
+    {
+        var resultado = await DialogService.OpenAsync<NuevoUsuarioDialog>("Crear Nuevo Usuario",
+            new Dictionary<string, object>(),
+            new DialogOptions { Width = "650px", Height = "540px", CloseDialogOnOverlayClick = false });
+
+        if (resultado != null && (bool)resultado == true)
+        {
+            await CargarUsuarios();
+            NotificationService.Notify(NotificationSeverity.Success, "Éxito", "Usuario creado correctamente");
+        }
+    }
+}

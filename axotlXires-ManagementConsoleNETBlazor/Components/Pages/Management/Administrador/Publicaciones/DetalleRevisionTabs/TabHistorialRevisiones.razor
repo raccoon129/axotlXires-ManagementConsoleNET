@@ -1,0 +1,106 @@
+﻿@using DAL.Modelos
+@using Radzen
+@using System.Linq
+@inherits ComponentBase
+
+@if (DetallePublicacion != null)
+{
+    <div class="mt-4">
+        @if (!DetallePublicacion.Revisiones.Any())
+        {
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                Esta publicación aún no ha tenido revisiones.
+            </div>
+        }
+        else
+        {
+            <h5>Revisiones anteriores (@DetallePublicacion.Revisiones.Count)</h5>
+            <div class="timeline mt-4">
+                @foreach (var revision in DetallePublicacion.Revisiones.OrderByDescending(r => r.FechaCreacion))
+                {
+                    <div class="timeline-item">
+                        <div class="timeline-marker @ObtenerClaseEstadoRevision(revision.Aprobado)">
+                            <i class="@ObtenerIconoEstadoRevision(revision.Aprobado)"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <div class="timeline-heading">
+                                <strong>@revision.TipoRevision</strong>
+                                <span class="text-muted ms-2">@revision.FechaCreacion.ToString("dd/MM/yyyy HH:mm")</span>
+                                <span class="ms-2">por <strong>@revision.Revisor</strong></span>
+                            </div>
+                            <div class="timeline-body mt-2">
+                                <p class="mb-2"><i>@revision.DescripcionRevision</i></p>
+
+                                @if (revision.Comentarios.Any())
+                                {
+                                    <div class="comentarios-revision">
+                                        @foreach (var comentario in revision.Comentarios)
+                                        {
+                                            <div class="comentario-item p-3 mb-2">
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <strong>@comentario.AutorComentario</strong>
+                                                    <small class="text-muted">@comentario.FechaCreacion.ToString("dd/MM/yyyy HH:mm")</small>
+                                                </div>
+                                                <div>@comentario.Contenido</div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+
+                                <div class="mt-3">
+                                    <RadzenBadge BadgeStyle="@ObtenerEstiloRevision(revision.Aprobado)"
+                                                 Text="@ObtenerTextoEstadoRevision(revision.Aprobado)" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public DetallePublicacion DetallePublicacion { get; set; }
+
+    private BadgeStyle ObtenerEstiloRevision(bool? aprobado)
+    {
+        return aprobado switch
+        {
+            true => BadgeStyle.Success,
+            false => BadgeStyle.Danger,
+            _ => BadgeStyle.Warning
+        };
+    }
+
+    private string ObtenerTextoEstadoRevision(bool? aprobado)
+    {
+        return aprobado switch
+        {
+            true => "APROBADO",
+            false => "CAMBIOS SOLICITADOS",
+            _ => "EN PROCESO"
+        };
+    }
+
+    private string ObtenerClaseEstadoRevision(bool? aprobado)
+    {
+        return aprobado switch
+        {
+            true => "approved",
+            false => "rejected",
+            _ => "pending"
+        };
+    }
+
+    private string ObtenerIconoEstadoRevision(bool? aprobado)
+    {
+        return aprobado switch
+        {
+            true => "bi bi-check",
+            false => "bi bi-x",
+            _ => "bi bi-clock-history"
+        };
+    }
+}

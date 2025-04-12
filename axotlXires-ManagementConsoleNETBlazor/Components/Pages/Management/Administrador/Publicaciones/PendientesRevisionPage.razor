@@ -1,0 +1,264 @@
+﻿@page "/administrador/publicaciones/pendientes"
+@using DAL.Modelos
+@using DAL.Consumo
+@using System.Text.Json
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject NotificationService NotificationService
+
+<div class="container-fluid">
+    <h3 class="mb-4">Publicaciones Pendientes de Revisión</h3>
+
+    <!-- Barra de búsqueda y filtros -->
+    <RadzenCard class="mb-4">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="d-flex">
+                    <RadzenTextBox Placeholder="Buscar por título o autor..."
+                                   @bind-Value="terminoBusqueda"
+                                   Change="@AplicarFiltros"
+                                   Style="width: 100%" />
+                    <RadzenButton Icon="search" ButtonStyle="ButtonStyle.Primary"
+                                  Click="@AplicarFiltros" Class="ms-2" />
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <RadzenButton Text="Actualizar" Icon="refresh"
+                              Click="@CargarPublicaciones"
+                              ButtonStyle="ButtonStyle.Light" />
+            </div>
+        </div>
+    </RadzenCard>
+
+    @if (cargando)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Primary"
+                                       Value="100"
+                                       ShowValue="false"
+                                       Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+    else if (error)
+    {
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">Error al cargar publicaciones</h4>
+            <p>@mensajeError</p>
+            <hr>
+            <RadzenButton Text="Reintentar" Click="@CargarPublicaciones" ButtonStyle="ButtonStyle.Secondary" />
+        </div>
+    }
+    else if (publicacionesFiltradas == null || !publicacionesFiltradas.Any())
+    {
+        <div class="alert alert-info" role="alert">
+            <h4 class="alert-heading">Sin publicaciones pendientes</h4>
+            <p>No se encontraron publicaciones pendientes de revisión que coincidan con los criterios de búsqueda.</p>
+        </div>
+    }
+    else
+    {
+        <!-- Tabla de publicaciones pendientes -->
+        <RadzenCard>
+            <RadzenDataGrid Data="@publicacionesFiltradas"
+                            TItem="PublicacionPendiente"
+                            AllowFiltering="false"
+                            AllowColumnResize="true"
+                            AllowAlternatingRows="true"
+                            AllowSorting="true"
+                            PageSize="10"
+                            AllowPaging="true">
+                <Columns>
+                    <!-- Título de la publicación -->
+                    <RadzenDataGridColumn TItem="PublicacionPendiente" Property="Titulo" Title="Título" Width="300px">
+                        <Template Context="publicacion">
+                            <div>
+                                <strong>@publicacion.Titulo</strong>
+                                <div class="small text-muted">@publicacion.TipoPublicacion</div>
+                            </div>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Autor -->
+                    <RadzenDataGridColumn TItem="PublicacionPendiente" Property="Autor" Title="Autor" Width="150px" />
+
+                    <!-- Fecha de creación -->
+                    <RadzenDataGridColumn TItem="PublicacionPendiente" Property="FechaCreacion" Title="Fecha de envío" Width="120px" SortProperty="FechaCreacion">
+                        <Template Context="publicacion">
+                            @publicacion.FechaCreacion.ToString("dd/MM/yyyy")
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Número de revisiones -->
+                    <RadzenDataGridColumn TItem="PublicacionPendiente" Property="TotalRevisiones" Title="Revisiones" Width="100px" TextAlign="TextAlign.Center">
+                        <Template Context="publicacion">
+                            <span class="badge bg-info">@publicacion.TotalRevisiones</span>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Última revisión -->
+                    <!-- Última revisión -->
+                    <RadzenDataGridColumn TItem="PublicacionPendiente" Property="UltimaRevision" Title="Última revisión" Width="200px">
+                        <Template Context="publicacion">
+                            @{
+                                var fechaUltimaRevision = publicacion.UltimaRevision != null
+                                ? DateTime.TryParse(publicacion.UltimaRevision.ToString(), out DateTime fecha)
+                                ? fecha
+                                : (DateTime?)null
+                                : null;
+                            }
+
+                            @if (fechaUltimaRevision.HasValue)
+                            {
+                                <div>
+                                    <strong>Revisión</strong>
+                                    <div class="small text-muted">
+                                        @fechaUltimaRevision.Value.ToString("dd/MM/yyyy HH:mm")
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="text-muted">Sin revisiones</span>
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+
+
+                    <!-- Acciones -->
+                    <RadzenDataGridColumn TItem="PublicacionPendiente" Title="Acciones" Width="180px" Sortable="false" TextAlign="TextAlign.Center">
+                        <Template Context="publicacion">
+                            <RadzenButton Icon="visibility" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                                          Click="@(() => VerDetallesPublicacion(publicacion.IdPublicacion))"
+                                          Variant="Variant.Flat" Tooltip="Ver y revisar" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenCard>
+    }
+
+    <!-- Leyenda de estados -->
+    <RadzenCard Class="mt-3">
+        <h5>Información sobre el Proceso de Revisión</h5>
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <h6><i class="bi bi-info-circle-fill text-primary me-2"></i>Flujo de Revisión</h6>
+                <ol class="small">
+                    <li>Una publicación es enviada por el autor para revisión</li>
+                    <li>Un revisor inicia el proceso de revisión seleccionando un tipo</li>
+                    <li>El revisor evalúa la publicación y proporciona retroalimentación</li>
+                    <li>La publicación puede ser aprobada o devuelta para cambios</li>
+                </ol>
+            </div>
+            <div class="col-md-6">
+                <h6><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Importante</h6>
+                <ul class="small">
+                    <li>Cada revisión debe incluir comentarios detallados</li>
+                    <li>Se puede solicitar cambios múltiples veces</li>
+                    <li>Solo se publican contenidos que han pasado por revisión</li>
+                </ul>
+            </div>
+        </div>
+    </RadzenCard>
+</div>
+
+@code {
+    // Variables para gestionar los datos y el estado
+    private List<PublicacionPendiente> publicaciones;
+    private List<PublicacionPendiente> publicacionesFiltradas;
+    private bool cargando = true;
+    private bool error = false;
+    private string mensajeError = string.Empty;
+    private string terminoBusqueda = string.Empty;
+
+    /// <summary>
+    /// Método que se ejecuta al inicializar el componente
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+        await CargarPublicaciones();
+    }
+
+    /// <summary>
+    /// Carga la lista de publicaciones pendientes desde la API
+    /// </summary>
+    private async Task CargarPublicaciones()
+    {
+        cargando = true;
+        error = false;
+        StateHasChanged();
+
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                // Redirigir al login si no hay sesión
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            // Consultar las publicaciones pendientes
+            publicaciones = await revisionPublicaciones.ObtenerPublicacionesPendientesAsync(token);
+
+            if (publicaciones != null)
+            {
+                // Aplicar filtros iniciales
+                AplicarFiltros();
+            }
+            else
+            {
+                error = true;
+                mensajeError = "No se pudieron cargar las publicaciones pendientes. Por favor, inténtelo de nuevo más tarde.";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = true;
+            mensajeError = $"Error al cargar publicaciones: {ex.Message}";
+            Console.WriteLine($"Error en CargarPublicaciones: {ex}");
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Aplica filtros de búsqueda a las publicaciones
+    /// </summary>
+    private void AplicarFiltros()
+    {
+        if (publicaciones == null)
+            return;
+
+        publicacionesFiltradas = publicaciones;
+
+        // Filtrar por término de búsqueda
+        if (!string.IsNullOrWhiteSpace(terminoBusqueda))
+        {
+            string termino = terminoBusqueda.ToLower();
+            publicacionesFiltradas = publicacionesFiltradas
+                .Where(p =>
+                    p.Titulo.ToLower().Contains(termino) ||
+                    p.Autor.ToLower().Contains(termino) ||
+                    p.TipoPublicacion.ToLower().Contains(termino))
+                .ToList();
+        }
+
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Navega a la página de detalles y revisión de la publicación
+    /// </summary>
+    private void VerDetallesPublicacion(int idPublicacion)
+    {
+        NavigationManager.NavigateTo($"/administrador/publicaciones/revision/{idPublicacion}");
+    }
+}

@@ -1,0 +1,236 @@
+﻿@page "/administrador/publicaciones/aprobadas"
+@using DAL.Modelos
+@using DAL.Consumo
+@using System.Text.Json
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject NotificationService NotificationService
+
+<div class="container-fluid">
+    <h3 class="mb-4">Publicaciones Aprobadas</h3>
+
+    <div class="d-flex justify-content-end mb-4">
+        <RadzenButton Text="Actualizar" Icon="refresh"
+                      Click="@CargarPublicaciones"
+                      ButtonStyle="ButtonStyle.Light" />
+    </div>
+
+    @if (cargando)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Primary"
+                                       Value="100"
+                                       ShowValue="false"
+                                       Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+    else if (error)
+    {
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">Error al cargar publicaciones</h4>
+            <p>@mensajeError</p>
+            <hr>
+            <RadzenButton Text="Reintentar" Click="@CargarPublicaciones" ButtonStyle="ButtonStyle.Secondary" />
+        </div>
+    }
+    else if (publicaciones == null || !publicaciones.Any())
+    {
+        <div class="alert alert-info" role="alert">
+            <h4 class="alert-heading">Sin publicaciones aprobadas</h4>
+            <p>No se encontraron publicaciones que hayan sido aprobadas y publicadas.</p>
+        </div>
+    }
+    else
+    {
+        <!-- Tabla de publicaciones aprobadas -->
+        <RadzenCard>
+            <RadzenDataGrid Data="@publicaciones"
+                            TItem="PublicacionConsulta"
+                            AllowFiltering="false"
+                            AllowColumnResize="true"
+                            AllowAlternatingRows="true"
+                            AllowSorting="true"
+                            PageSize="10"
+                            AllowPaging="true">
+                <Columns>
+                    <!-- Título de la publicación -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Property="Titulo" Title="Título" Width="250px">
+                        <Template Context="publicacion">
+                            <div>
+                                <strong>@publicacion.Titulo</strong>
+                                <div class="small text-muted">@publicacion.TipoPublicacion</div>
+                            </div>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Autor -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Property="Autor" Title="Autor" Width="150px">
+                        <Template Context="publicacion">
+                            <div>
+                                @publicacion.Autor
+                                @if (!string.IsNullOrEmpty(publicacion.NombramientoAutor))
+                                {
+                                    <div class="small text-muted">@publicacion.NombramientoAutor</div>
+                                }
+                            </div>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Fecha de publicación -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Property="FechaPublicacion" Title="Fecha publicación" Width="120px" SortProperty="FechaPublicacion">
+                        <Template Context="publicacion">
+                            @(publicacion.FechaPublicacion.HasValue ? publicacion.FechaPublicacion.Value.ToString("dd/MM/yyyy") : "-")
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Estadísticas -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Title="Estadísticas" Width="120px" TextAlign="TextAlign.Center">
+                        <Template Context="publicacion">
+                            <div class="d-flex gap-2 justify-content-center">
+                                <span title="Comentarios">
+                                    <i class="bi bi-chat-text text-primary"></i> @publicacion.TotalComentarios
+                                </span>
+                                <span title="Favoritos">
+                                    <i class="bi bi-star-fill text-warning"></i> @publicacion.TotalFavoritos
+                                </span>
+                            </div>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Visibilidad -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Property="EsPrivadaBool" Title="Visibilidad" Width="120px" TextAlign="TextAlign.Center">
+                        <Template Context="publicacion">
+                            @if (publicacion.EsPrivadaBool)
+                            {
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-lock-fill me-1"></i> Privada
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-success">
+                                    <i class="bi bi-globe me-1"></i> Pública
+                                </span>
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Estado (siempre será "publicado") -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Property="Estado" Title="Estado" Width="120px" TextAlign="TextAlign.Center">
+                        <Template Context="publicacion">
+                            <span class="badge bg-success">
+                                PUBLICADO
+                            </span>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Acciones -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Title="Acciones" Width="120px" Sortable="false" TextAlign="TextAlign.Center">
+                        <Template Context="publicacion">
+                            <RadzenButton Icon="visibility" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                                          Click="@(() => VerDetallesPublicacion(publicacion.IdPublicacion))"
+                                          Variant="Variant.Flat" Tooltip="Ver detalles" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenCard>
+    }
+
+    <!-- Leyenda explicativa -->
+    <RadzenCard Class="mt-3">
+        <h5>Información sobre Publicaciones Aprobadas</h5>
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <h6><i class="bi bi-info-circle-fill text-primary me-2"></i>Sobre esta sección</h6>
+                <p class="small">
+                    Esta sección muestra las publicaciones que han pasado por el proceso de revisión
+                    y han sido aprobadas para su publicación. Estos contenidos ya están disponibles
+                    para los usuarios de la plataforma según su configuración de visibilidad.
+                </p>
+                <p class="small">
+                    Las publicaciones aprobadas pueden recibir comentarios y ser marcadas como
+                    favoritas por los usuarios, lo que aumenta su visibilidad e interacción.
+                </p>
+            </div>
+            <div class="col-md-6">
+                <h6><i class="bi bi-lightbulb-fill text-warning me-2"></i>Interacción con publicaciones</h6>
+                <ul class="small">
+                    <li>Las publicaciones públicas son visibles para todos los usuarios</li>
+                    <li>Las publicaciones privadas solo son accesibles por usuarios autorizados</li>
+                    <li>Los indicadores de estadísticas muestran el nivel de interacción con cada publicación</li>
+                    <li>Puede revisar el historial completo de revisiones en los detalles de cada publicación</li>
+                </ul>
+            </div>
+        </div>
+    </RadzenCard>
+</div>
+
+@code {
+    // Variables para gestionar los datos y el estado
+    private List<PublicacionConsulta> publicaciones;
+    private bool cargando = true;
+    private bool error = false;
+    private string mensajeError = string.Empty;
+
+    /// <summary>
+    /// Método que se ejecuta al inicializar el componente
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+        await CargarPublicaciones();
+    }
+
+    /// <summary>
+    /// Carga la lista de publicaciones aprobadas desde la API
+    /// </summary>
+    private async Task CargarPublicaciones()
+    {
+        cargando = true;
+        error = false;
+        StateHasChanged();
+
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                // Redirigir al login si no hay sesión
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            // Consultar las publicaciones aprobadas
+            publicaciones = await consultarPublicaciones.ObtenerPublicacionesAprobadasAsync(token);
+
+            if (publicaciones == null)
+            {
+                error = true;
+                mensajeError = "No se pudieron cargar las publicaciones aprobadas. Por favor, inténtelo de nuevo más tarde.";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = true;
+            mensajeError = $"Error al cargar publicaciones: {ex.Message}";
+            Console.WriteLine($"Error en CargarPublicaciones: {ex}");
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Navega a la página de detalles completos de la publicación
+    /// </summary>
+    private void VerDetallesPublicacion(int idPublicacion)
+    {
+        NavigationManager.NavigateTo($"/administrador/publicaciones/detalle/{idPublicacion}");
+    }
+}

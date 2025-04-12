@@ -1,0 +1,369 @@
+﻿@page "/administrador/publicaciones/parametros"
+@using DAL.Modelos
+@using DAL.Consumo
+@using System.ComponentModel.DataAnnotations
+@using System.Text.Json
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@using axotlXires_ManagementConsoleNETBlazor.Components.Pages.Management.Administrador.Publicaciones.TipoPublicacionDialogs
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<div class="container-fluid">
+    <h3 class="mb-4">Parámetros de Publicaciones</h3>
+
+    <!-- Sección de Tipos de Publicación -->
+    <RadzenCard class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="mb-0"><i class="bi bi-journal-text me-2"></i>Tipos de Publicación</h4>
+            <RadzenButton Click="@MostrarDialogoCrearTipo" Text="Nuevo Tipo" Icon="add" ButtonStyle="ButtonStyle.Primary" />
+        </div>
+
+        @if (cargandoTipos)
+        {
+            <div class="d-flex justify-content-center my-4">
+                <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Primary"
+                                           Value="100"
+                                           ShowValue="false"
+                                           Mode="ProgressBarMode.Indeterminate" />
+            </div>
+        }
+        else if (errorTipos)
+        {
+            <div class="alert alert-danger" role="alert">
+                <h5 class="alert-heading">Error al cargar los tipos de publicación</h5>
+                <p>@mensajeErrorTipos</p>
+                <hr>
+                <RadzenButton Text="Reintentar" Click="@CargarTiposPublicacion" ButtonStyle="ButtonStyle.Secondary" />
+            </div>
+        }
+        else if (tiposPublicacion == null || !tiposPublicacion.Any())
+        {
+            <div class="alert alert-info" role="alert">
+                <h5 class="alert-heading">Sin tipos de publicación</h5>
+                <p>No se encontraron tipos de publicación configurados. Utilice el botón "Nuevo Tipo" para crear el primero.</p>
+            </div>
+        }
+        else
+        {
+            <RadzenDataGrid Data="@tiposPublicacion"
+                            TItem="TipoPublicacion"
+                            AllowFiltering="false"
+                            AllowColumnResize="true"
+                            AllowAlternatingRows="true"
+                            AllowSorting="true"
+                            PageSize="5"
+                            AllowPaging="true">
+                <Columns>
+                    <!-- ID -->
+                    <RadzenDataGridColumn TItem="TipoPublicacion" Property="IdTipo" Title="ID" Width="70px" TextAlign="TextAlign.Center" />
+
+                    <!-- Nombre -->
+                    <RadzenDataGridColumn TItem="TipoPublicacion" Property="Nombre" Title="Nombre" Width="200px">
+                        <Template Context="tipo">
+                            <strong>@tipo.Nombre</strong>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Descripción -->
+                    <RadzenDataGridColumn TItem="TipoPublicacion" Property="Descripcion" Title="Descripción">
+                        <Template Context="tipo">
+                            @tipo.Descripcion
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Acciones -->
+                    <RadzenDataGridColumn TItem="TipoPublicacion" Title="Acciones" Width="120px" TextAlign="TextAlign.Center">
+                        <Template Context="tipo">
+                            <div class="d-flex justify-content-center gap-1">
+                                <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                                              Click="@(() => MostrarDialogoEditarTipo(tipo))" Variant="Variant.Flat" Tooltip="Editar" />
+                                <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small"
+                                              Click="@(() => ConfirmarEliminarTipo(tipo))" Variant="Variant.Flat" Tooltip="Eliminar" />
+                            </div>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        }
+    </RadzenCard>
+
+    <!-- Sección de estadísticas si están disponibles -->
+    @if (estadisticasUso != null && estadisticasUso.Any())
+    {
+        <RadzenCard class="mb-4">
+            <h4 class="mb-3"><i class="bi bi-bar-chart-fill me-2"></i>Estadísticas de Uso</h4>
+
+            <RadzenDataGrid Data="@estadisticasUso"
+                            TItem="EstadisticaTipoPublicacion"
+                            AllowFiltering="false"
+                            AllowColumnResize="true"
+                            AllowAlternatingRows="true"
+                            AllowSorting="true"
+                            PageSize="5"
+                            AllowPaging="true">
+                <Columns>
+                    <!-- Nombre -->
+                    <RadzenDataGridColumn TItem="EstadisticaTipoPublicacion" Property="Nombre" Title="Tipo de Publicación" Width="200px">
+                        <Template Context="tipo">
+                            <strong>@tipo.Nombre</strong>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Total Publicaciones -->
+                    <RadzenDataGridColumn TItem="EstadisticaTipoPublicacion" Property="TotalPublicaciones" Title="Total" Width="80px" TextAlign="TextAlign.Center">
+                        <Template Context="tipo">
+                            <span class="badge bg-primary">@tipo.TotalPublicaciones</span>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Publicadas -->
+                    <RadzenDataGridColumn TItem="EstadisticaTipoPublicacion" Property="Publicadas" Title="Publicadas" Width="100px" TextAlign="TextAlign.Center">
+                        <Template Context="tipo">
+                            <span class="badge bg-success">@tipo.Publicadas</span>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- En Revisión -->
+                    <RadzenDataGridColumn TItem="EstadisticaTipoPublicacion" Property="EnRevision" Title="En Revisión" Width="100px" TextAlign="TextAlign.Center">
+                        <Template Context="tipo">
+                            <span class="badge bg-warning text-dark">@tipo.EnRevision</span>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Borradores -->
+                    <RadzenDataGridColumn TItem="EstadisticaTipoPublicacion" Property="Borradores" Title="Borradores" Width="100px" TextAlign="TextAlign.Center">
+                        <Template Context="tipo">
+                            <span class="badge bg-secondary">@tipo.Borradores</span>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenCard>
+    }
+
+    <!-- Información de ayuda -->
+    <RadzenCard>
+        <h5><i class="bi bi-info-circle-fill text-primary me-2"></i>Información sobre Parámetros</h5>
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <h6>Tipos de Publicación</h6>
+                <p class="small">
+                    Los tipos de publicación definen las categorías disponibles para los usuarios al crear una nueva publicación.
+                    Estas categorías ayudan a clasificar el contenido y permiten aplicar diferentes flujos de revisión según el tipo.
+                </p>
+                <p class="small">
+                    <strong>Importante:</strong> No es posible eliminar un tipo que esté siendo utilizado por publicaciones existentes.
+                </p>
+            </div>
+            <div class="col-md-6">
+                <h6>Recomendaciones</h6>
+                <ul class="small">
+                    <li>Utilice nombres claros y descriptivos para cada tipo</li>
+                    <li>Incluya una descripción detallada que ayude a los autores a elegir el tipo correcto</li>
+                    <li>Evite crear tipos muy similares entre sí para reducir la confusión</li>
+                    <li>Considere las estadísticas de uso al evaluar qué tipos mantener</li>
+                </ul>
+            </div>
+        </div>
+    </RadzenCard>
+</div>
+
+@code {
+    // Variables para tipos de publicación
+    private List<TipoPublicacion> tiposPublicacion;
+    private List<EstadisticaTipoPublicacion> estadisticasUso;
+    private bool cargandoTipos = true;
+    private bool errorTipos = false;
+    private string mensajeErrorTipos = string.Empty;
+
+    // Variables para el formulario de nuevo tipo
+    private TipoPublicacion tipoEditar = new TipoPublicacion();
+    private bool modoEdicion = false;
+
+    /// <summary>
+    /// Método que se ejecuta al inicializar el componente
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+        await CargarTiposPublicacion();
+        await CargarEstadisticasUso();
+    }
+
+    /// <summary>
+    /// Carga la lista de tipos de publicación desde la API
+    /// </summary>
+    private async Task CargarTiposPublicacion()
+    {
+        cargandoTipos = true;
+        errorTipos = false;
+        StateHasChanged();
+
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                // Redirigir al login si no hay sesión
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            // Consultar los tipos de publicación
+            tiposPublicacion = await DAL.Consumo.tiposPublicacion.ObtenerTiposPublicacionAsync(token);
+
+            if (tiposPublicacion == null)
+            {
+                errorTipos = true;
+                mensajeErrorTipos = "No se pudieron cargar los tipos de publicación. Por favor, inténtelo de nuevo más tarde.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorTipos = true;
+            mensajeErrorTipos = $"Error al cargar tipos de publicación: {ex.Message}";
+            Console.WriteLine($"Error en CargarTiposPublicacion: {ex}");
+        }
+        finally
+        {
+            cargandoTipos = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Carga las estadísticas de uso de tipos de publicación
+    /// </summary>
+    private async Task CargarEstadisticasUso()
+    {
+        try
+        {
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                return;
+            }
+
+            estadisticasUso = await DAL.Consumo.tiposPublicacion.ObtenerEstadisticasUsoAsync(token);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar estadísticas: {ex.Message}");
+            // No mostramos error en UI para no sobrecargar la página con alertas
+        }
+    }
+
+    /// <summary>
+    /// Muestra el diálogo para crear un nuevo tipo de publicación
+    /// </summary>
+    private async Task MostrarDialogoCrearTipo()
+    {
+        modoEdicion = false;
+        tipoEditar = new TipoPublicacion();
+
+        await MostrarDialogoTipo("Crear Nuevo Tipo de Publicación");
+    }
+
+    /// <summary>
+    /// Muestra el diálogo para editar un tipo de publicación existente
+    /// </summary>
+    private async Task MostrarDialogoEditarTipo(TipoPublicacion tipo)
+    {
+        modoEdicion = true;
+        tipoEditar = new TipoPublicacion
+            {
+                IdTipo = tipo.IdTipo,
+                Nombre = tipo.Nombre,
+                Descripcion = tipo.Descripcion
+            };
+
+        await MostrarDialogoTipo("Editar Tipo de Publicación");
+    }
+
+    /// <summary>
+    /// Muestra el diálogo para crear o editar un tipo de publicación
+    /// </summary>
+    private async Task MostrarDialogoTipo(string titulo)
+    {
+        var resultado = await DialogService.OpenAsync<DialogoTipoPublicacion>(titulo,
+            new Dictionary<string, object>
+                    {
+                { "Tipo", tipoEditar },
+                { "ModoEdicion", modoEdicion }
+                    },
+            new DialogOptions
+                {
+                    Width = "600px",
+                    CloseDialogOnOverlayClick = false,
+                    ShowClose = true,
+                    CloseDialogOnEsc = true
+                });
+
+        if (resultado != null)
+        {
+            // Si el resultado no es nulo, significa que se guardó correctamente
+            await CargarTiposPublicacion();
+            await CargarEstadisticasUso();
+        }
+    }
+
+    /// <summary>
+    /// Muestra confirmación y elimina un tipo de publicación
+    /// </summary>
+    private async Task ConfirmarEliminarTipo(TipoPublicacion tipo)
+    {
+        var confirmacion = await DialogService.Confirm(
+            $"¿Está seguro que desea eliminar el tipo de publicación \"{tipo.Nombre}\"?",
+            "Confirmar eliminación",
+            new ConfirmOptions
+                {
+                    OkButtonText = "Sí, eliminar",
+                    CancelButtonText = "Cancelar"
+                });
+
+        if (confirmacion == true)
+        {
+            await EliminarTipo(tipo.IdTipo);
+        }
+    }
+
+    /// <summary>
+    /// Elimina un tipo de publicación
+    /// </summary>
+    private async Task EliminarTipo(int idTipo)
+    {
+        try
+        {
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            var respuesta = await DAL.Consumo.tiposPublicacion.EliminarTipoPublicacionAsync(token, idTipo);
+
+            if (respuesta.Status == "success")
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Éxito", "Tipo de publicación eliminado correctamente");
+                await CargarTiposPublicacion();
+                await CargarEstadisticasUso();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", respuesta.Mensaje ?? "No se pudo eliminar el tipo de publicación");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error al eliminar: {ex.Message}");
+        }
+    }
+}

@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35913.81
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "axotlXires-ManagementConsoleNETBlazor", "axotlXires-ManagementConsoleNETBlazor\axotlXires-ManagementConsoleNETBlazor.csproj", "{4935BE97-0B03-496D-B01E-58C6AACB4B1C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DAL", "DAL\DAL.csproj", "{94B0EDC1-A482-459C-8FB8-96EE0B6A6904}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4935BE97-0B03-496D-B01E-58C6AACB4B1C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4935BE97-0B03-496D-B01E-58C6AACB4B1C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4935BE97-0B03-496D-B01E-58C6AACB4B1C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4935BE97-0B03-496D-B01E-58C6AACB4B1C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{94B0EDC1-A482-459C-8FB8-96EE0B6A6904}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{94B0EDC1-A482-459C-8FB8-96EE0B6A6904}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{94B0EDC1-A482-459C-8FB8-96EE0B6A6904}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{94B0EDC1-A482-459C-8FB8-96EE0B6A6904}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {43BFAA68-0F53-46A0-A33B-E57227411C1E}
+	EndGlobalSection
+EndGlobal

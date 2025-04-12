@@ -1,0 +1,261 @@
+﻿@inherits LayoutComponentBase
+
+<header class="cabecera-navbar">
+    <nav class="contenedor-navbar">
+        <div class="contenido-navbar">
+            <!-- Logo y nombre -->
+            <div class="seccion-logo-navbar">
+                <div class="marca-navbar">
+                    <img src="/img/logoMorado2.png" alt="Logo Axotl Xires" class="logo-navbar" />
+                    <span class="titulo-navbar">Axotl.org</span>
+                    <div class="divisor-navbar"></div>
+                    <div class="contenedor-subtitulo-navbar">
+                        <span class="subtitulo-navbar">Axotl Xires</span>
+                        <span class="subtitulo-pequeno-navbar">Management Console</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Espacio para migas de pan -->
+            <div class="migas-pan-navbar">
+                <!-- Las migas de pan irán aquí -->
+            </div>
+
+            <!-- Menú derecho - condicionalmente visible -->
+            @if (estaAutenticado)
+            {
+                <div class="menu-navbar">
+                    <!-- Notificaciones -->
+                    <button class="boton-notificacion-navbar">
+                        <i class="fa fa-bell"></i>
+                        <span class="indicador-notificacion"></span>
+                    </button>
+
+                    <!-- Menú de usuario -->
+                    <div class="menu-usuario-navbar">
+                        <button @onclick="AlternarMenuUsuario" class="boton-usuario-navbar">
+                            <div class="avatar-usuario-navbar">
+                                <i class="fa fa-user"></i>
+                            </div>
+                            <span class="nombre-usuario-navbar">@nombreUsuario</span>
+                        </button>
+
+                        @if (mostrarMenuUsuario)
+                        {
+                            <div class="desplegable-usuario-navbar">
+                                <a href="/perfil" class="item-desplegable-navbar">
+                                    <i class="fa fa-user"></i>
+                                    Mi Perfil
+                                </a>
+                                <button @onclick="CerrarSesion" class="item-desplegable-navbar cerrar-sesion-navbar">
+                                    <i class="fa fa-sign-out-alt"></i>
+                                    Cerrar Sesión
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </nav>
+</header>
+
+<style>
+    .cabecera-navbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background-color: white;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        z-index: 50;
+    }
+
+    .contenedor-navbar {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
+
+    .contenido-navbar {
+        height: 4rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .seccion-logo-navbar {
+        display: flex;
+        align-items: center;
+    }
+
+    .marca-navbar {
+        display: flex;
+        align-items: center;
+    }
+
+    .logo-navbar {
+        width: 40px;
+        height: 40px;
+        object-fit: contain;
+    }
+
+    .titulo-navbar {
+        margin-left: 0.5rem;
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #1f2937;
+    }
+
+    .divisor-navbar {
+        height: 1.5rem;
+        width: 1px;
+        background-color: #e5e7eb;
+        margin: 0 0.75rem;
+    }
+
+    .contenedor-subtitulo-navbar {
+        display: flex;
+        flex-direction: column;
+        margin-left: 0.75rem;
+    }
+
+    .subtitulo-navbar {
+        font-size: 1.125rem;
+        font-weight: bold;
+        color: #612c7d;
+    }
+
+    .subtitulo-pequeno-navbar {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: -0.25rem;
+    }
+
+    .migas-pan-navbar {
+        flex: 1;
+        margin: 0 2rem;
+    }
+
+    .menu-navbar {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .boton-notificacion-navbar {
+        padding: 0.5rem;
+        border-radius: 9999px;
+        border: none;
+        background: transparent;
+        position: relative;
+        cursor: pointer;
+    }
+
+        .boton-notificacion-navbar:hover {
+            background-color: #f3f4f6;
+        }
+
+    .indicador-notificacion {
+        position: absolute;
+        top: 0.25rem;
+        right: 0.25rem;
+        height: 0.5rem;
+        width: 0.5rem;
+        background-color: #ef4444;
+        border-radius: 9999px;
+    }
+
+    .menu-usuario-navbar {
+        position: relative;
+    }
+
+    .boton-usuario-navbar {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+    }
+
+        .boton-usuario-navbar:hover {
+            background-color: #f3f4f6;
+        }
+
+    .avatar-usuario-navbar {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 9999px;
+        background-color: #612c7d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+
+    .nombre-usuario-navbar {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #374151;
+    }
+
+    .desplegable-usuario-navbar {
+        position: absolute;
+        right: 0;
+        margin-top: 0.5rem;
+        width: 12rem;
+        background-color: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e5e7eb;
+        padding: 0.25rem 0;
+        z-index: 10;
+    }
+
+    .item-desplegable-navbar {
+        display: flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+        color: #374151;
+        text-decoration: none;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        cursor: pointer;
+    }
+
+        .item-desplegable-navbar:hover {
+            background-color: #f3f4f6;
+        }
+
+        .item-desplegable-navbar i {
+            margin-right: 0.5rem;
+            font-size: 1rem;
+        }
+
+    .cerrar-sesion-navbar {
+        color: #dc2626;
+    }
+</style>
+
+@code {
+    private bool mostrarMenuUsuario = false;
+    private bool estaAutenticado = true; // Temporalmente establecido en true
+    private string nombreUsuario = "Administrador";
+
+    private void AlternarMenuUsuario()
+    {
+        mostrarMenuUsuario = !mostrarMenuUsuario;
+    }
+
+    private async Task CerrarSesion()
+    {
+        // Implementar lógica de cierre de sesión aquí
+        // NavigationManager.NavigateTo("/login");
+    }
+}

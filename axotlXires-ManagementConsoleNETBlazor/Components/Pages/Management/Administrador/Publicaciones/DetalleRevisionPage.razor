@@ -1,0 +1,378 @@
+﻿@page "/administrador/publicaciones/revision/{IdPublicacion:int}"
+@using DAL.Modelos
+@using DAL.Consumo
+@using System.Text.Json
+@using axotlXires_ManagementConsoleNETBlazor.Components.Pages.Management.Administrador.Publicaciones.DetalleRevisionTabs
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<div class="container-fluid">
+    @if (cargando)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Primary"
+                                         Value="100"
+                                         ShowValue="false"
+                                         Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+    else if (error)
+    {
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">Error al cargar la publicación</h4>
+            <p>@mensajeError</p>
+            <hr>
+            <div class="d-flex gap-2">
+                <RadzenButton Text="Reintentar" Click="@CargarDetallePublicacion" ButtonStyle="ButtonStyle.Secondary" />
+                <RadzenButton Text="Volver" Click="@VolverAListado" ButtonStyle="ButtonStyle.Light" Icon="arrow_back" />
+            </div>
+        </div>
+    }
+    else if (detallePublicacion != null)
+    {
+        <!-- Encabezado con información de la publicación -->
+        <div class="mb-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3>@detallePublicacion.Publicacion.Titulo</h3>
+                <RadzenButton Text="Volver al listado" Icon="arrow_back" Click="@VolverAListado" ButtonStyle="ButtonStyle.Light" />
+            </div>
+            <div class="d-flex gap-3 text-muted mt-2">
+                <div><i class="bi bi-person me-1"></i> @detallePublicacion.Publicacion.Autor</div>
+                <div><i class="bi bi-calendar3 me-1"></i> @detallePublicacion.Publicacion.FechaCreacion.ToString("dd/MM/yyyy")</div>
+                <div><i class="bi bi-journal-text me-1"></i> @detallePublicacion.Publicacion.TipoPublicacion</div>
+                <div>
+                    <i class="bi bi-flag me-1"></i>
+                    <RadzenBadge BadgeStyle="@ObtenerEstiloPorEstado(detallePublicacion.Publicacion.Estado)"
+                                 Text="@ObtenerTextoEstado(detallePublicacion.Publicacion.Estado)" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs para navegar entre secciones -->
+        <RadzenTabs>
+            <Tabs>
+                <RadzenTabsItem Text="Contenido" Icon="article" Selected="true">
+                    <TabContenido DetallePublicacion="@detallePublicacion" />
+                </RadzenTabsItem>
+
+                <RadzenTabsItem Text="Historial de Revisiones" Icon="history">
+                    <TabHistorialRevisiones DetallePublicacion="@detallePublicacion" />
+                </RadzenTabsItem>
+
+                @if (detallePublicacion.Publicacion.Estado.ToLower() == DAL.Modelos.EstadoPublicacion.EnRevision)
+                {
+                    <RadzenTabsItem Text="Realizar Revisión" Icon="rate_review">
+                        <TabRealizarRevision RevisionActiva="@revisionActiva"
+                                             TiposRevision="@detallePublicacion.TiposRevision"
+                                             IdPublicacion="@IdPublicacion"
+                                             UrlVisualizacion="@($"{Parametros.UrlBaseApi}/api/visualizar/{IdPublicacion}")"
+                                             OnFinalizarRevision="FinalizarRevisionHandler"
+                                             OnCancelarRevision="@(() => CancelarRevision())"
+                                             OnIniciarNuevaRevision="IniciarNuevaRevision" />
+                    </RadzenTabsItem>
+                }
+            </Tabs>
+        </RadzenTabs>
+
+    }
+</div>
+
+<style>
+    /* Se mantienen los estilos para la línea de tiempo y demás elementos */
+    .timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+    .timeline-item {
+        position: relative;
+        margin-bottom: 30px;
+    }
+    .timeline-marker {
+        position: absolute;
+        left: -30px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 20px;
+        color: white;
+        font-size: 12px;
+    }
+    .timeline-marker.pending { background-color: #f0ad4e; }
+    .timeline-marker.approved { background-color: #5cb85c; }
+    .timeline-marker.rejected { background-color: #d9534f; }
+    .timeline-content {
+        padding: 15px;
+        border-radius: 5px;
+        border: 1px solid #dee2e6;
+        background-color: #fff;
+    }
+    .timeline-heading {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .comentario-item {
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        border-left: 3px solid #6c757d;
+    }
+    .tipos-revision {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 15px;
+    }
+    .tipo-revision-card {
+        padding: 15px;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .tipo-revision-card:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-2px);
+    }
+    .tipo-revision-card.selected {
+        background-color: #e3f2fd;
+        border-color: #90caf9;
+    }
+    .contenido-publicacion {
+        line-height: 1.6;
+    }
+</style>
+
+@code {
+    [Parameter] public int IdPublicacion { get; set; }
+
+    // Constantes para decisiones de revisión
+    //private const string DECISION_APROBAR = "aprobar";
+    //private const string DECISION_SOLICITAR_CAMBIOS = "solicitar_cambios";
+
+    // Variables para gestionar los datos y el estado
+    private DetallePublicacion detallePublicacion;
+    private RevisionCompleta revisionActiva;
+    private bool cargando = true;
+    private bool error = false;
+    private string mensajeError = string.Empty;
+
+    // Variables para la revisión (se usan en los métodos de negocio)
+    private int tipoRevisionSeleccionado = 0;
+    private string comentarioRevision = string.Empty;
+    private string decisionRevision = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+        await CargarDetallePublicacion();
+    }
+
+    private async Task CargarDetallePublicacion()
+    {
+        cargando = true;
+        error = false;
+        StateHasChanged();
+
+        try
+        {
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            detallePublicacion = await revisionPublicaciones.ObtenerDetallePublicacionAsync(token, IdPublicacion);
+
+            if (detallePublicacion != null)
+            {
+                revisionActiva = detallePublicacion.Revisiones.FirstOrDefault(r => r.Aprobado == null);
+            }
+            else
+            {
+                error = true;
+                mensajeError = "No se pudo cargar la información de la publicación. Por favor, inténtelo de nuevo más tarde.";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = true;
+            mensajeError = $"Error al cargar detalles: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private void VolverAListado() => NavigationManager.NavigateTo("/administrador/publicaciones/pendientes");
+
+    // private void SeleccionarTipoRevision(int id)
+    // {
+    //     tipoRevisionSeleccionado = id;
+    //     StateHasChanged();
+    // }
+
+    /// <summary>
+    /// Inicia una nueva revisión con los datos proporcionados
+    /// </summary>
+    private async Task IniciarNuevaRevision(TabRealizarRevision.RevisionInicioData datos)
+    {
+        if (string.IsNullOrWhiteSpace(datos.TipoRevision) ||
+            string.IsNullOrWhiteSpace(datos.DescripcionRevision) ||
+            string.IsNullOrWhiteSpace(datos.ComentarioInicial))
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Datos incompletos",
+                "Debe proporcionar el tipo de revisión, la descripción y un comentario inicial.");
+            return;
+        }
+
+        try
+        {
+            string token = await AuthService.ObtenerToken();
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            // Aquí necesitamos crear un nuevo TipoRevision o usar uno existente
+            // Para simplificar, asumimos que se creará un nuevo tipo de revisión en el backend
+
+            // Realizar petición para iniciar revisión con los datos proporcionados
+            var respuesta = await revisionPublicaciones.IniciarRevisionCustomAsync(
+                token,
+                IdPublicacion,
+                datos.TipoRevision,
+                datos.DescripcionRevision,
+                datos.ComentarioInicial);
+
+            if (respuesta.Status == "success")
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Éxito", "Se ha iniciado la revisión correctamente");
+                await CargarDetallePublicacion();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", respuesta.Mensaje ?? "No se pudo iniciar la revisión");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error al iniciar revisión: {ex.Message}");
+        }
+    }
+
+    private async Task FinalizarRevisionHandler(TabRealizarRevision.RevisionResultado resultado)
+    {
+        if (revisionActiva == null)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Atención", "No hay una revisión activa para finalizar");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(resultado.Comentario) || string.IsNullOrEmpty(resultado.Decision))
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Atención", "Debe ingresar un comentario y seleccionar una decisión");
+            return;
+        }
+
+        try
+        {
+            string token = await AuthService.ObtenerToken();
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            var respuesta = await revisionPublicaciones.FinalizarRevisionAsync(
+                token,
+                revisionActiva.IdRevision,
+                resultado.Decision,
+                resultado.Comentario);
+
+            if (respuesta.Status == "success")
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Éxito", "Revisión finalizada correctamente");
+
+                // Mensaje específico según la decisión tomada
+                string decisionMensaje;
+                if (resultado.Decision == DAL.Modelos.DecisionRevision.Aprobar)
+                {
+                    decisionMensaje = "La publicación ha sido aprobada y será visible para todos los usuarios";
+                }
+                else if (resultado.Decision == DAL.Modelos.DecisionRevision.SolicitarCambios)
+                {
+                    decisionMensaje = "Se han solicitado cambios al autor para mejorar la publicación";
+                }
+                else // Rechazar
+                {
+                    decisionMensaje = "La publicación ha sido rechazada. El autor deberá crear una nueva publicación.";
+                }
+
+                NotificationService.Notify(NotificationSeverity.Info, "Información", decisionMensaje);
+
+                var confirmacion = await DialogService.Confirm(
+                    "¿Desea volver al listado de publicaciones pendientes?",
+                    "Revisión completada",
+                    new ConfirmOptions { OkButtonText = "Sí", CancelButtonText = "No" });
+
+                if (confirmacion == true)
+                {
+                    VolverAListado();
+                }
+                else
+                {
+                    await CargarDetallePublicacion();
+                }
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error",
+                    respuesta.Mensaje ?? "No se pudo finalizar la revisión");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error",
+                $"Error al finalizar revisión: {ex.Message}");
+        }
+    }
+
+    private void CancelarRevision()
+    {
+        comentarioRevision = string.Empty;
+        decisionRevision = string.Empty;
+        StateHasChanged();
+    }
+
+    private BadgeStyle ObtenerEstiloPorEstado(string estado)
+    {
+        return estado.ToLower() switch
+        {
+            "borrador" => BadgeStyle.Light,
+            "en_revision" => BadgeStyle.Warning,
+            "publicado" => BadgeStyle.Success,
+            "rechazado" => BadgeStyle.Danger,
+            _ => BadgeStyle.Secondary
+        };
+    }
+
+    private string ObtenerTextoEstado(string estado)
+    {
+        return estado.ToLower() switch
+        {
+            "borrador" => "BORRADOR",
+            "en_revision" => "EN REVISIÓN",
+            "publicado" => "PUBLICADO",
+            "rechazado" => "RECHAZADO",
+            _ => estado.ToUpper()
+        };
+    }
+}

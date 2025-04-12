@@ -1,0 +1,165 @@
+﻿@page "/"
+@using axotlXires_ManagementConsoleNETBlazor.Components.Layout
+@layout LoginLayout
+
+
+@using axotlXires_ManagementConsoleNETBlazor.Components.Layout
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@using System.Text.Json
+
+@inject AuthService AuthService
+<NavbarLogin />
+
+<div class="contenedor-login">
+    <div class="imagen-fondo"></div>
+    <div class="tarjeta-login">
+        <RadzenCard>
+            <div class="encabezado-login">
+                <img src="/img/IconAxotlXiresAzul.png" alt="Logo" class="logo-login" />
+                <br />
+                <br />
+                <h3>Ingrese sus credenciales</h3>
+            </div>
+            <div class="cuerpo-login">
+                <label for="correo">Correo Electrónico o Xires ID</label>
+                <RadzenTextBox id="correo" class="control-formulario" Placeholder="usuario@axotl.org" @bind-Value="correo" />
+                <label for="contrasena">Contraseña</label>
+                <RadzenPassword id="contrasena" class="control-formulario" Placeholder="******" @bind-Value="contrasena" />
+                <RadzenButton class="btn-primario" Text="Iniciar Sesión" Click="@IniciarSesion" Disabled="@cargando" />
+
+                @if (!string.IsNullOrEmpty(mensajeError))
+                {
+                    <div class="alert alert-danger mt-2">@mensajeError</div>
+                }
+
+            </div>
+            <div class="pie-login">
+                <p><strong>Versión 0.1</strong></p>
+                <h6>AutomataSoft Xires 2025</h6>
+                <h6>Todos los derechos reservados</h6>
+            </div>
+        </RadzenCard>
+    </div>
+</div>
+
+<style>
+    .contenedor-login {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    height: 100vh;
+    background-color: #5A2D82;
+    position: relative;
+    }
+    .imagen-fondo {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 40%;
+    background-image: url('/img/MitadAjoloteBlanco.png');
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    }
+    .tarjeta-login {
+    width: 400px;
+    z-index: 1;
+    margin-right: 50px; /* Ajusta este valor según sea necesario */
+    }
+    .encabezado-login {
+    text-align: center;
+    }
+    .logo-login {
+    width: 200px;
+    height: auto;
+    }
+    .cuerpo-login {
+    margin-top: 20px;
+    }
+    .control-formulario {
+    width: 100%;
+    margin-bottom: 10px;
+    }
+    .btn-primario {
+    width: 100%;
+    }
+    .pie-login {
+    text-align: center;
+    margin-top: 20px;
+    }
+</style>
+
+@code {
+    string correo;
+    string contrasena;
+    bool cargando = false;
+    string mensajeError;
+    bool renderedOnce = false;
+
+    // No usamos OnInitializedAsync para evitar el problema de JS interop durante prerenderizado
+    protected override void OnInitialized()
+    {
+        // No intentamos acceder a localStorage aquí
+    }
+
+    // En su lugar, usamos OnAfterRender que se ejecuta en el cliente
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            renderedOnce = true;
+
+            // Inicializar el servicio de autenticación de forma segura
+            await AuthService.InitializeAsync();
+
+            // Comprobar si ya hay una sesión activa
+            var token = await AuthService.ObtenerToken();
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                // Si ya hay un token, redirigir directamente al dashboard
+                DAL.Parametros.token = token; // Asignar token a parámetros
+                NavigationManager.NavigateTo("/administrador/inicio");
+            }
+        }
+    }
+
+    async Task IniciarSesion()
+    {
+        if (string.IsNullOrWhiteSpace(correo) || string.IsNullOrWhiteSpace(contrasena))
+        {
+            mensajeError = "Por favor, completa ambos campos.";
+            return;
+        }
+
+        cargando = true;
+        mensajeError = string.Empty;
+
+        try
+        {
+            var respuesta = await DAL.Consumo.auth.LoginAdministradorAsync(correo, contrasena);
+            if (respuesta.status == "success")
+            {
+                // Guardar el token y los datos del usuario
+                string userData = JsonSerializer.Serialize(respuesta.datos.usuario);
+                await AuthService.GuardarSesion(respuesta.datos.token, userData);
+
+                // Redirigir al dashboard
+                NavigationManager.NavigateTo("/administrador/inicio");
+            }
+            else
+            {
+                mensajeError = respuesta.mensaje;
+            }
+        }
+        catch (Exception ex)
+        {
+            mensajeError = $"Error de conexión: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+}

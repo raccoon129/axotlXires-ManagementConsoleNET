@@ -1,0 +1,435 @@
+﻿@using DAL.Modelos
+@using DAL.Consumo
+@using Radzen
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@inject AuthService AuthService
+@inject NotificationService NotificationService
+@inherits ComponentBase
+
+<div class="revision-container mt-4">
+    <div class="row">
+        <!-- Columna izquierda: Contenido de la publicación en iframe -->
+        <div class="col-md-6">
+            <RadzenCard class="mb-4 h-100 contenido-iframe">
+                <h5 class="d-flex align-items-center">
+                    <i class="bi bi-book me-2"></i>
+                    Vista previa del contenido
+                </h5>
+                <hr />
+
+                @if (!string.IsNullOrEmpty(UrlVisualizacion))
+                {
+                    <iframe src="@UrlVisualizacion"
+                            style="width: 100%; height: calc(100vh - 200px); border: none;"
+                            title="Contenido de la publicación">
+                    </iframe>
+                }
+                else
+                {
+                    <div class="text-center p-5">
+                        <i class="bi bi-eye-slash" style="font-size: 3rem; color: #ccc;"></i>
+                        <p class="mt-3 text-muted">Vista previa no disponible</p>
+                    </div>
+                }
+            </RadzenCard>
+        </div>
+
+        <!-- Columna derecha: Formulario de revisión unificado -->
+        <div class="col-md-6">
+            <!-- Formulario unificado para realizar la revisión -->
+            <RadzenCard class="mb-4">
+                <h5 class="d-flex align-items-center">
+                    <i class="bi bi-clipboard-check me-2"></i>
+                    @(RevisionActiva != null ? "Revisión en curso" : "Realizar revisión")
+                </h5>
+
+                @if (RevisionActiva != null)
+                {
+                    <div class="alert alert-info mb-4">
+                        <div class="d-flex">
+                            <div class="me-2"><i class="bi bi-info-circle-fill"></i></div>
+                            <div>
+                                <p class="mb-0">
+                                    <strong>Tipo de revisión:</strong> @RevisionActiva.TipoRevision
+                                </p>
+                                <p class="mb-0">
+                                    <strong>Descripción:</strong> @RevisionActiva.DescripcionRevision
+                                </p>
+                                <p class="mb-0 text-muted">
+                                    Iniciada el @RevisionActiva.FechaCreacion.ToString("dd/MM/yyyy HH:mm")
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="mt-4">
+                        <RadzenText TextStyle="TextStyle.Subtitle2">Tipo de revisión</RadzenText>
+                        <RadzenTextBox @bind-Value="TipoRevisionTexto"
+                                       Placeholder="Ejemplo: Ortografía, Contenido, Referencias, etc."
+                                       Style="width: 100%;" />
+                        @if (string.IsNullOrEmpty(TipoRevisionTexto))
+                        {
+                            <div class="text-danger small mt-1">
+                                El tipo de revisión es obligatorio
+                            </div>
+                        }
+                    </div>
+
+                    <div class="mt-4">
+                        <RadzenText TextStyle="TextStyle.Subtitle2">Descripción de la revisión</RadzenText>
+                        <RadzenTextArea @bind-Value="DescripcionRevision"
+                                        Placeholder="Describa brevemente el propósito y enfoque de esta revisión..."
+                                        Style="width: 100%; min-height: 80px;" />
+                        @if (string.IsNullOrEmpty(DescripcionRevision))
+                        {
+                            <div class="text-danger small mt-1">
+                                La descripción de la revisión es obligatoria
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div class="mt-4">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Comentario de retroalimentación</RadzenText>
+                    <RadzenTextArea @bind-Value="ComentarioRevision"
+                                    Placeholder="Proporcione una retroalimentación detallada al autor de la publicación. Sea específico sobre lo que funciona bien y lo que requiere mejoras."
+                                    Style="width: 100%; min-height: 150px;" />
+                    @if (string.IsNullOrEmpty(ComentarioRevision))
+                    {
+                        <div class="text-danger small mt-1">
+                            El comentario de retroalimentación es obligatorio
+                        </div>
+                    }
+                </div>
+
+                <div class="mt-4">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Decisión final</RadzenText>
+                    <div class="decision-cards mt-2">
+                        <div class="decision-card @(DecisionRevision == DECISION_APROBAR ? "selected" : "")"
+                             @onclick="@(() => DecisionRevision = DECISION_APROBAR)">
+                            <div class="decision-icon success">
+                                <i class="bi bi-check-circle"></i>
+                            </div>
+                            <div class="decision-content">
+                                <h6>Aprobar publicación</h6>
+                                <p class="text-muted small mb-0">La publicación cumple con los estándares de calidad y será visible para todos los usuarios.</p>
+                            </div>
+                        </div>
+
+                        <div class="decision-card @(DecisionRevision == DECISION_SOLICITAR_CAMBIOS ? "selected" : "")"
+                             @onclick="@(() => DecisionRevision = DECISION_SOLICITAR_CAMBIOS)">
+                            <div class="decision-icon warning">
+                                <i class="bi bi-arrow-repeat"></i>
+                            </div>
+                            <div class="decision-content">
+                                <h6>Solicitar cambios</h6>
+                                <p class="text-muted small mb-0">La publicación necesita mejoras antes de ser aprobada. El autor podrá modificarla y volver a enviarla a revisión.</p>
+                            </div>
+                        </div>
+
+                        <div class="decision-card @(DecisionRevision == DECISION_RECHAZAR ? "selected" : "")"
+                             @onclick="@(() => DecisionRevision = DECISION_RECHAZAR)">
+                            <div class="decision-icon danger">
+                                <i class="bi bi-x-circle"></i>
+                            </div>
+                            <div class="decision-content">
+                                <h6>Rechazar publicación</h6>
+                                <p class="text-muted small mb-0">La publicación no cumple con los estándares mínimos. El autor no podrá modificarla y deberá crear una nueva.</p>
+                            </div>
+                        </div>
+                    </div>
+                    @if (string.IsNullOrEmpty(DecisionRevision))
+                    {
+                        <div class="text-danger small mt-2">
+                            Debe seleccionar una decisión
+                        </div>
+                    }
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <RadzenButton Text="Cancelar"
+                                  Icon="cancel"
+                                  ButtonStyle="ButtonStyle.Light"
+                                  Click="@(() => OnCancelarRevision.InvokeAsync())" />
+
+                    <RadzenButton Text="Finalizar Revisión"
+                                  Icon="check_circle"
+                                  ButtonStyle="ButtonStyle.Success"
+                                  Click="@FinalizarRevisionHandler"
+                                  Disabled="@(!PuedeFinalizarRevision())" />
+                </div>
+            </RadzenCard>
+
+            <!-- Instrucciones y mejores prácticas para realizar revisiones -->
+            <RadzenCard>
+                <h5 class="d-flex align-items-center">
+                    <i class="bi bi-lightbulb me-2"></i>
+                    Guía para revisiones efectivas
+                </h5>
+                <div class="revision-tips">
+                    <div class="revision-tip-item">
+                        <div class="revision-tip-icon">
+                            <i class="bi bi-check2-all"></i>
+                        </div>
+                        <div class="revision-tip-content">
+                            <h6>Sea específico</h6>
+                            <p class="small text-muted mb-0">Proporcione ejemplos concretos y ubicaciones exactas donde se necesitan mejoras.</p>
+                        </div>
+                    </div>
+
+                    <div class="revision-tip-item">
+                        <div class="revision-tip-icon">
+                            <i class="bi bi-chat-quote"></i>
+                        </div>
+                        <div class="revision-tip-content">
+                            <h6>Sea constructivo</h6>
+                            <p class="small text-muted mb-0">Ofrezca sugerencias junto con críticas. Indique cómo se podrían abordar los problemas.</p>
+                        </div>
+                    </div>
+
+                    <div class="revision-tip-item">
+                        <div class="revision-tip-icon">
+                            <i class="bi bi-stars"></i>
+                        </div>
+                        <div class="revision-tip-content">
+                            <h6>Destaque lo positivo</h6>
+                            <p class="small text-muted mb-0">Comience reconociendo los puntos fuertes antes de abordar las áreas de mejora.</p>
+                        </div>
+                    </div>
+                </div>
+            </RadzenCard>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Estilos para las tarjetas de decisión */
+    .decision-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .decision-card {
+        display: flex;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+        .decision-card:hover {
+            background-color: #f8f9fa;
+            transform: translateY(-2px);
+        }
+
+        .decision-card.selected {
+            background-color: #f0f9ff;
+            border-color: #73c0fc;
+            box-shadow: 0 2px 5px rgba(0,123,255,0.15);
+        }
+
+    .decision-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        margin-right: 12px;
+        font-size: 1.2rem;
+    }
+
+        .decision-icon.success {
+            background-color: #d4edda;
+            color: #28a745;
+        }
+
+        .decision-icon.warning {
+            background-color: #fff3cd;
+            color: #ffc107;
+        }
+
+        .decision-icon.danger {
+            background-color: #f8d7da;
+            color: #dc3545;
+        }
+
+    .decision-content {
+        flex: 1;
+    }
+
+    /* Estilos para tips de revisión */
+    .revision-tips {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-top: 12px;
+    }
+
+    .revision-tip-item {
+        display: flex;
+        align-items: flex-start;
+    }
+
+    .revision-tip-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background-color: #e3f2fd;
+        color: #0d6efd;
+        margin-right: 12px;
+        font-size: 1rem;
+    }
+
+    .revision-tip-content {
+        flex: 1;
+    }
+
+    /* Contenedor del iframe */
+    .contenido-iframe {
+        display: flex;
+        flex-direction: column;
+    }
+</style>
+
+@code {
+    // Usar las constantes definidas en el modelo con nombre completo
+    private string DECISION_APROBAR => DAL.Modelos.DecisionRevision.Aprobar;
+    private string DECISION_SOLICITAR_CAMBIOS => DAL.Modelos.DecisionRevision.SolicitarCambios;
+    private string DECISION_RECHAZAR => DAL.Modelos.DecisionRevision.Rechazar;
+
+    // Parámetros de entrada
+    [Parameter] public RevisionCompleta RevisionActiva { get; set; }
+    [Parameter] public IEnumerable<TipoRevision> TiposRevision { get; set; }
+    [Parameter] public int IdPublicacion { get; set; }
+    [Parameter] public string UrlVisualizacion { get; set; }
+
+    // Eventos para comunicarse con el componente padre
+    [Parameter] public EventCallback<RevisionResultado> OnFinalizarRevision { get; set; }
+    [Parameter] public EventCallback OnCancelarRevision { get; set; }
+    [Parameter] public EventCallback<RevisionInicioData> OnIniciarNuevaRevision { get; set; }
+
+    // Variables locales para manejar el estado del formulario
+    private string TipoRevisionTexto { get; set; } = string.Empty;
+    private string DescripcionRevision { get; set; } = string.Empty;
+    private string ComentarioRevision { get; set; } = string.Empty;
+    private string DecisionRevision { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Verifica si se cumplen las condiciones para poder finalizar la revisión
+    /// </summary>
+    private bool PuedeFinalizarRevision()
+    {
+        // Verificar datos básicos necesarios
+        var datosBasicosCompletos = !string.IsNullOrWhiteSpace(ComentarioRevision) &&
+                                   !string.IsNullOrEmpty(DecisionRevision);
+
+        // Si ya hay una revisión activa, solo necesitamos los datos básicos
+        if (RevisionActiva != null)
+        {
+            return datosBasicosCompletos;
+        }
+
+        // Si es una nueva revisión, necesitamos también el tipo y descripción
+        return datosBasicosCompletos &&
+               !string.IsNullOrWhiteSpace(TipoRevisionTexto) &&
+               !string.IsNullOrWhiteSpace(DescripcionRevision);
+    }
+
+    /// <summary>
+    /// Manejador para el evento de finalizar la revisión
+    /// </summary>
+    private async Task FinalizarRevisionHandler()
+    {
+        if (!PuedeFinalizarRevision())
+        {
+            // Validar que se cumplan todas las condiciones
+            NotificationService.Notify(NotificationSeverity.Warning, "Datos incompletos",
+                "Debe proporcionar todos los campos requeridos.");
+            return;
+        }
+
+        // Si no hay una revisión activa, primero debemos iniciarla
+        if (RevisionActiva == null)
+        {
+            // Crear objeto para iniciar la revisión
+            var datosInicio = new RevisionInicioData
+                {
+                    TipoRevision = TipoRevisionTexto.Trim(),
+                    DescripcionRevision = DescripcionRevision.Trim(),
+                    ComentarioInicial = ComentarioRevision.Trim() // Usar el comentario de retroalimentación como inicial
+                };
+
+            // Invocar el evento para iniciar la revisión
+            await OnIniciarNuevaRevision.InvokeAsync(datosInicio);
+        }
+
+        // Crear el objeto resultado con la decisión y el comentario
+        var resultado = new RevisionResultado
+            {
+                Decision = DecisionRevision,
+                Comentario = ComentarioRevision
+            };
+
+        // Invocar el evento del componente padre pasando el resultado
+        await OnFinalizarRevision.InvokeAsync(resultado);
+
+        // Limpiar el formulario
+        LimpiarFormulario();
+    }
+
+    /// <summary>
+    /// Limpia todos los campos del formulario
+    /// </summary>
+    private void LimpiarFormulario()
+    {
+        TipoRevisionTexto = string.Empty;
+        DescripcionRevision = string.Empty;
+        ComentarioRevision = string.Empty;
+        DecisionRevision = string.Empty;
+    }
+
+    /// <summary>
+    /// Clase para encapsular el resultado de la revisión
+    /// </summary>
+    public class RevisionResultado
+    {
+        /// <summary>
+        /// Decisión tomada: "aprobar", "solicitar_cambios" o "rechazar"
+        /// </summary>
+        public string Decision { get; set; }
+
+        /// <summary>
+        /// Comentario detallado de retroalimentación para el autor
+        /// </summary>
+        public string Comentario { get; set; }
+    }
+
+    /// <summary>
+    /// Clase para encapsular los datos de inicio de una revisión
+    /// </summary>
+    public class RevisionInicioData
+    {
+        /// <summary>
+        /// Tipo de revisión ingresado por el usuario
+        /// </summary>
+        public string TipoRevision { get; set; }
+
+        /// <summary>
+        /// Descripción de la revisión
+        /// </summary>
+        public string DescripcionRevision { get; set; }
+
+        /// <summary>
+        /// Comentario inicial
+        /// </summary>
+        public string ComentarioInicial { get; set; }
+    }
+}

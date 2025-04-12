@@ -1,0 +1,219 @@
+﻿@using DAL.Modelos
+@using DAL.Consumo
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@inject AuthService AuthService
+@inject DialogService DialogService
+
+<div class="container">
+    <!-- Encabezado del diálogo -->
+    <div class="mb-4">
+        <h6>Usuario a evaluar:</h6>
+        <p class="text-primary">@NombreUsuario</p>
+    </div>
+
+    <!-- Rol actual -->
+    <div class="mb-4">
+        <label class="form-label">Rol actual:</label>
+        <div class="d-flex align-items-center p-2 bg-light rounded">
+            <i class="@ObtenerIconoRol(RolActual) me-2" style="font-size: 1.4rem;"></i>
+            <span class="badge @ObtenerColorRol(RolActual)">@RolActual.ToUpper()</span>
+        </div>
+    </div>
+
+    <!-- Selector de nuevo rol -->
+    <div class="mb-4">
+        <label class="form-label">Seleccione el nuevo rol:</label>
+
+        <!-- Lista de opciones de roles -->
+        <div class="role-options">
+            @foreach (var rol in RolesDisponibles)
+            {
+                <div class="role-option @(nuevoRol == rol ? "selected" : "")"
+                     @onclick="() => SeleccionarRol(rol)">
+                    <i class="@ObtenerIconoRol(rol) me-2"></i>
+                    <div>
+                        <div class="fw-bold">@rol.ToUpper()</div>
+                        <small class="text-muted">@ObtenerDescripcionRol(rol)</small>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Mensajes de error -->
+    @if (!string.IsNullOrEmpty(mensajeError))
+    {
+        <div class="alert alert-danger">@mensajeError</div>
+    }
+
+    <!-- Botones de acción -->
+    <div class="d-flex justify-content-between mt-4">
+        <RadzenButton Text="Cancelar"
+                      ButtonStyle="ButtonStyle.Light"
+                      Click="@CerrarModal"
+                      Class="w-100 me-2" />
+
+        <RadzenButton Text="Guardar cambios"
+                      ButtonStyle="ButtonStyle.Primary"
+                      Click="@GuardarCambios"
+                      Class="w-100 ms-2"
+                      Disabled="@(string.IsNullOrEmpty(nuevoRol) || nuevoRol == RolActual || procesando)" />
+    </div>
+</div>
+
+<style>
+    /* Estilos para las opciones de rol */
+    .role-options {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .role-option {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+        .role-option:hover {
+            background-color: #f8f9fa;
+        }
+
+        .role-option.selected {
+            background-color: #e9f2ff;
+            border-color: #80bdff;
+        }
+</style>
+
+@code {
+    // Parámetros recibidos del componente padre
+    [Parameter] public int IdUsuario { get; set; }
+    [Parameter] public string NombreUsuario { get; set; }
+    [Parameter] public string RolActual { get; set; }
+    [Parameter] public List<string> RolesDisponibles { get; set; }
+
+    // Variables para el estado del componente
+    private string nuevoRol = string.Empty;
+    private string mensajeError = string.Empty;
+    private bool procesando = false;
+
+    /// <summary>
+    /// Selecciona un rol de la lista de opciones
+    /// </summary>
+    private void SeleccionarRol(string rol)
+    {
+        nuevoRol = rol;
+        mensajeError = string.Empty;
+    }
+
+    /// <summary>
+    /// Cierra el modal sin realizar cambios
+    /// </summary>
+    private void CerrarModal()
+    {
+        DialogService.Close(false);
+    }
+
+    /// <summary>
+    /// Realiza el cambio de rol y guarda los cambios
+    /// </summary>
+    private async Task GuardarCambios()
+    {
+        // Validaciones básicas
+        if (string.IsNullOrEmpty(nuevoRol))
+        {
+            mensajeError = "Debe seleccionar un nuevo rol";
+            return;
+        }
+
+        if (nuevoRol == RolActual)
+        {
+            mensajeError = "El nuevo rol debe ser diferente al actual";
+            return;
+        }
+
+        // Iniciar proceso de guardado
+        procesando = true;
+        mensajeError = string.Empty;
+
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                mensajeError = "La sesión ha expirado. Por favor, inicie sesión nuevamente.";
+                procesando = false;
+                return;
+            }
+
+            // Llamar a la API para cambiar el rol
+            var respuesta = await gestionUsuarios.CambiarRolUsuarioAsync(token, IdUsuario, nuevoRol);
+
+            // Verificar resultado de la operación
+            if (respuesta.Status == "success")
+            {
+                DialogService.Close(true); // Cerrar con éxito
+            }
+            else
+            {
+                mensajeError = respuesta.Mensaje ?? "Error al cambiar el rol del usuario";
+            }
+        }
+        catch (Exception ex)
+        {
+            mensajeError = $"Se produjo un error: {ex.Message}";
+        }
+        finally
+        {
+            procesando = false;
+        }
+    }
+
+    /// <summary>
+    /// Obtiene el ícono correspondiente al rol
+    /// </summary>
+    private string ObtenerIconoRol(string rol)
+    {
+        return rol.ToLower() switch
+        {
+            "administrador" => "bi bi-shield-fill",
+            "moderador" => "bi bi-person-badge-fill",
+            "revisor" => "bi bi-person-check-fill",
+            _ => "bi bi-person-fill"
+        };
+    }
+
+    /// <summary>
+    /// Obtiene la clase de color para la insignia de rol
+    /// </summary>
+    private string ObtenerColorRol(string rol)
+    {
+        return rol.ToLower() switch
+        {
+            "administrador" => "bg-danger text-white",
+            "moderador" => "bg-warning text-dark",
+            "revisor" => "bg-success text-white",
+            _ => "bg-info text-white"
+        };
+    }
+
+    /// <summary>
+    /// Obtiene la descripción del rol para mostrar en la interfaz
+    /// </summary>
+    private string ObtenerDescripcionRol(string rol)
+    {
+        return rol.ToLower() switch
+        {
+            "administrador" => "Acceso total al sistema y gestión de usuarios",
+            "moderador" => "Revisión de contenido y moderación",
+            "revisor" => "Revisión específica de publicaciones",
+            _ => "Acceso básico a la plataforma"
+        };
+    }
+}

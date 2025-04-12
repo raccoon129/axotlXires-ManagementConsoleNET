@@ -1,0 +1,76 @@
+﻿@using DAL.Modelos
+@using Radzen
+@using System.Linq
+@inherits ComponentBase
+
+@if (DetallePublicacion != null)
+{
+    <div class="row mt-4">
+        <div class="col-md-8">
+            <!-- Resumen -->
+            <RadzenCard class="mb-4">
+                <h5>Resumen</h5>
+                <div class="my-3">@DetallePublicacion.Publicacion.Resumen</div>
+            </RadzenCard>
+
+            <!-- Contenido principal -->
+            <RadzenCard>
+                <h5>Contenido de la publicación</h5>
+                <div class="contenido-publicacion my-3">
+                    @((MarkupString)DetallePublicacion.Publicacion.Contenido)
+                </div>
+            </RadzenCard>
+        </div>
+
+        <div class="col-md-4">
+            <!-- Imagen de portada, si existe -->
+            @if (!string.IsNullOrEmpty(DetallePublicacion.Publicacion.ImagenPortada))
+            {
+                <RadzenCard class="mb-4">
+                    <RadzenImage Path="@DetallePublicacion.Publicacion.ImagenPortada"
+                                 Style="width: 100%; border-radius: 4px;" />
+                </RadzenCard>
+            }
+
+            <!-- Referencias -->
+            <RadzenCard class="mb-4">
+                <h5>Referencias</h5>
+                <div class="my-2">
+                    @((MarkupString)FormatearReferencias(DetallePublicacion.Publicacion.Referencias))
+                </div>
+            </RadzenCard>
+
+            <!-- Información del autor -->
+            <RadzenCard>
+                <h5>Sobre el autor</h5>
+                <div class="d-flex align-items-center mt-3">
+                    <div class="me-3">
+                        <RadzenIcon Icon="person" Style="font-size: 2rem;" />
+                    </div>
+                    <div>
+                        <div><strong>@DetallePublicacion.Publicacion.Autor</strong></div>
+                        <div class="text-muted">@DetallePublicacion.Publicacion.NombramientoAutor</div>
+                    </div>
+                </div>
+            </RadzenCard>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public DetallePublicacion DetallePublicacion { get; set; }
+
+    private string FormatearReferencias(string referencias)
+    {
+        if (string.IsNullOrEmpty(referencias))
+            return "<p>No hay referencias disponibles</p>";
+
+        // Si ya es HTML, devolver tal cual
+        if (referencias.Contains("<") && referencias.Contains(">"))
+            return referencias;
+
+        // Si es texto plano, separarlo en líneas y convertir a lista HTML
+        var lineas = referencias.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+        return "<ul>" + string.Join("", lineas.Select(l => $"<li>{l.Trim()}</li>")) + "</ul>";
+    }
+}

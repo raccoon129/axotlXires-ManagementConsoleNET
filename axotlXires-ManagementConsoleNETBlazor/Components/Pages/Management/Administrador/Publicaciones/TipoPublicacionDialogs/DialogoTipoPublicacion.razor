@@ -1,0 +1,149 @@
+﻿@using DAL.Modelos
+@using DAL.Consumo
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@inject AuthService AuthService
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<div class="container">
+    <RadzenTemplateForm TItem="TipoPublicacion" Data="@Tipo" Submit="GuardarTipo">
+        <div class="row mb-3">
+            <div class="col-md-12">
+                <RadzenFormField Text="Nombre" Variant="Variant.Filled">
+                    <RadzenTextBox @bind-Value="@Tipo.Nombre" Name="Nombre" MaxLength="100" />
+                    <RadzenRequiredValidator Component="Nombre" Text="El nombre es obligatorio" />
+                </RadzenFormField>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <RadzenFormField Text="Descripción" Variant="Variant.Filled">
+                    <RadzenTextArea @bind-Value="@Tipo.Descripcion" Name="Descripcion" Rows="3" MaxLength="500" />
+                    <RadzenRequiredValidator Component="Descripcion" Text="La descripción es obligatoria" />
+                </RadzenFormField>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12 d-flex justify-content-end gap-2">
+                <RadzenButton ButtonType="ButtonType.Button" ButtonStyle="ButtonStyle.Light"
+                              Text="Cancelar" Click="@CancelarGuardado" />
+
+                <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Primary"
+                              Text="@(ModoEdicion ? "Guardar cambios" : "Crear tipo")"
+                              Disabled="@(string.IsNullOrWhiteSpace(Tipo.Nombre) || string.IsNullOrWhiteSpace(Tipo.Descripcion))" />
+            </div>
+        </div>
+    </RadzenTemplateForm>
+</div>
+
+@if (guardando)
+{
+    <div class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center">
+        <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Primary"
+                                   Value="100"
+                                   ShowValue="false"
+                                   Mode="ProgressBarMode.Indeterminate" />
+    </div>
+}
+
+@code {
+    [Parameter] public TipoPublicacion Tipo { get; set; } = new();
+    [Parameter] public bool ModoEdicion { get; set; } = false;
+
+    private bool guardando = false;
+
+    /// <summary>
+    /// Cierra el diálogo sin guardar cambios
+    /// </summary>
+    private void CancelarGuardado()
+    {
+        DialogService.Close();
+    }
+
+    /// <summary>
+    /// Guarda los cambios en el tipo de publicación
+    /// </summary>
+    private async Task GuardarTipo()
+    {
+        if (string.IsNullOrWhiteSpace(Tipo.Nombre) || string.IsNullOrWhiteSpace(Tipo.Descripcion))
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Datos incompletos",
+                "Debe completar todos los campos obligatorios");
+            return;
+        }
+
+        guardando = true;
+        StateHasChanged();
+
+        try
+        {
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error de autenticación",
+                    "No se pudo autenticar. Intente iniciar sesión nuevamente.");
+                return;
+            }
+
+            if (ModoEdicion)
+            {
+                // Actualizar tipo existente
+                var tipoActualizar = new ActualizarTipoPublicacion
+                    {
+                        Nombre = Tipo.Nombre,
+                        Descripcion = Tipo.Descripcion
+                    };
+
+                var respuesta = await tiposPublicacion.ActualizarTipoPublicacionAsync(token, Tipo.IdTipo, tipoActualizar);
+
+                if (respuesta?.Status == "success")
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Éxito",
+                        "Tipo de publicación actualizado correctamente");
+                    DialogService.Close(respuesta.Datos);
+                }
+                else
+                {
+                    NotificationService.Notify(NotificationSeverity.Error, "Error",
+                        respuesta?.Mensaje ?? "No se pudo actualizar el tipo de publicación");
+                }
+            }
+            else
+            {
+                // Crear nuevo tipo
+                var nuevoTipo = new NuevoTipoPublicacion
+                    {
+                        Nombre = Tipo.Nombre,
+                        Descripcion = Tipo.Descripcion
+                    };
+
+                var respuesta = await tiposPublicacion.CrearTipoPublicacionAsync(token, nuevoTipo);
+
+                if (respuesta?.Status == "success")
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Éxito",
+                        "Tipo de publicación creado correctamente");
+                    DialogService.Close(respuesta.Datos);
+                }
+                else
+                {
+                    NotificationService.Notify(NotificationSeverity.Error, "Error",
+                        respuesta?.Mensaje ?? "No se pudo crear el tipo de publicación");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error",
+                $"Error al {(ModoEdicion ? "actualizar" : "crear")} tipo de publicación: {ex.Message}");
+        }
+        finally
+        {
+            guardando = false;
+            StateHasChanged();
+        }
+    }
+}

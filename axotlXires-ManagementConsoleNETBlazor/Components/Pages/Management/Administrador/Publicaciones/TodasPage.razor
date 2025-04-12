@@ -1,0 +1,302 @@
+﻿@page "/administrador/publicaciones/todas"
+@using DAL.Modelos
+@using DAL.Consumo
+@using System.Text.Json
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject NotificationService NotificationService
+
+<div class="container-fluid">
+    <h3 class="mb-4">Todas las Publicaciones</h3>
+
+    <div class="d-flex justify-content-end mb-4">
+        <RadzenButton Text="Actualizar" Icon="refresh"
+                      Click="@CargarPublicaciones"
+                      ButtonStyle="ButtonStyle.Light" />
+    </div>
+
+    @if (cargando)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Primary"
+                                       Value="100"
+                                       ShowValue="false"
+                                       Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+    else if (error)
+    {
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">Error al cargar publicaciones</h4>
+            <p>@mensajeError</p>
+            <hr>
+            <RadzenButton Text="Reintentar" Click="@CargarPublicaciones" ButtonStyle="ButtonStyle.Secondary" />
+        </div>
+    }
+    else if (publicaciones == null || !publicaciones.Any())
+    {
+        <div class="alert alert-info" role="alert">
+            <h4 class="alert-heading">Sin publicaciones</h4>
+            <p>No se encontraron publicaciones en el sistema.</p>
+        </div>
+    }
+    else
+    {
+        <!-- Tabla de publicaciones -->
+        <RadzenCard>
+            <RadzenDataGrid Data="@publicaciones"
+                            TItem="PublicacionConsulta"
+                            AllowFiltering="false"
+                            AllowColumnResize="true"
+                            AllowAlternatingRows="true"
+                            AllowSorting="true"
+                            PageSize="10"
+                            AllowPaging="true">
+                <Columns>
+                    <!-- Título de la publicación -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Property="Titulo" Title="Título" Width="250px">
+                        <Template Context="publicacion">
+                            <div>
+                                <strong>@publicacion.Titulo</strong>
+                                <div class="small text-muted">@publicacion.TipoPublicacion</div>
+                            </div>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Autor -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Property="Autor" Title="Autor" Width="150px">
+                        <Template Context="publicacion">
+                            <div>
+                                @publicacion.Autor
+                                @if (!string.IsNullOrEmpty(publicacion.NombramientoAutor))
+                                {
+                                    <div class="small text-muted">@publicacion.NombramientoAutor</div>
+                                }
+                            </div>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Fecha de creación -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Property="FechaCreacion" Title="Fecha creación" Width="120px" SortProperty="FechaCreacion">
+                        <Template Context="publicacion">
+                            @publicacion.FechaCreacion.ToString("dd/MM/yyyy")
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Fecha de publicación -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Property="FechaPublicacion" Title="Fecha publicación" Width="120px">
+                        <Template Context="publicacion">
+                            @(publicacion.FechaPublicacion.HasValue ? publicacion.FechaPublicacion.Value.ToString("dd/MM/yyyy") : "-")
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Estadísticas -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Title="Estadísticas" Width="100px" TextAlign="TextAlign.Center">
+                        <Template Context="publicacion">
+                            <div class="d-flex gap-2 justify-content-center">
+                                <span title="Comentarios">
+                                    <i class="bi bi-chat-text text-primary"></i> @publicacion.TotalComentarios
+                                </span>
+                                <span title="Favoritos">
+                                    <i class="bi bi-star-fill text-warning"></i> @publicacion.TotalFavoritos
+                                </span>
+                            </div>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Visibilidad -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Property="EsPrivadaBool" Title="Visibilidad" Width="100px" TextAlign="TextAlign.Center">
+                        <Template Context="publicacion">
+                            @if (publicacion.EsPrivadaBool)
+                            {
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-lock-fill me-1"></i> Privada
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-success">
+                                    <i class="bi bi-globe me-1"></i> Pública
+                                </span>
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Estado -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Property="Estado" Title="Estado" Width="140px" TextAlign="TextAlign.Center">
+                        <Template Context="publicacion">
+                            <span class="badge @GetEstadoClass(publicacion.Estado)">
+                                @GetEstadoDisplayText(publicacion.Estado)
+                            </span>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <!-- Acciones -->
+                    <RadzenDataGridColumn TItem="PublicacionConsulta" Title="Acciones" Width="120px" Sortable="false" TextAlign="TextAlign.Center">
+                        <Template Context="publicacion">
+                            <RadzenButton Icon="visibility" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                                          Click="@(() => VerDetallesPublicacion(publicacion.IdPublicacion))"
+                                          Variant="Variant.Flat" Tooltip="Ver detalles" />
+
+                            @if (publicacion.Estado.ToLower() == "solicita_cambios" || publicacion.Estado.ToLower() == "en_revision")
+                            {
+                                <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Small"
+                                              Click="@(() => VerRevisionPublicacion(publicacion.IdPublicacion))"
+                                              Variant="Variant.Flat" Tooltip="Revisar" />
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenCard>
+    }
+
+    <!-- Leyenda de estados -->
+    <RadzenCard Class="mt-3">
+        <h5>Información sobre Listado de Publicaciones</h5>
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <h6><i class="bi bi-info-circle-fill text-primary me-2"></i>Sobre esta sección</h6>
+                <p class="small">
+                    Esta sección muestra todas las publicaciones registradas en el sistema,
+                    independientemente de su estado actual. Desde aquí puede acceder a los
+                    detalles completos de cada publicación y realizar acciones según su estado.
+                </p>
+            </div>
+            <div class="col-md-6">
+                <h6><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Leyenda de estados</h6>
+                <div class="small">
+                    <div class="d-flex gap-2 mb-1 align-items-center">
+                        <span class="badge bg-secondary">BORRADOR</span>
+                        <span>La publicación está siendo editada por el autor</span>
+                    </div>
+                    <div class="d-flex gap-2 mb-1 align-items-center">
+                        <span class="badge bg-warning text-dark">EN REVISIÓN</span>
+                        <span>La publicación está siendo revisada</span>
+                    </div>
+                    <div class="d-flex gap-2 mb-1 align-items-center">
+                        <span class="badge bg-info text-dark">CAMBIOS SOLICITADOS</span>
+                        <span>Se han solicitado modificaciones al autor</span>
+                    </div>
+                    <div class="d-flex gap-2 mb-1 align-items-center">
+                        <span class="badge bg-success">PUBLICADO</span>
+                        <span>La publicación ha sido aprobada y publicada</span>
+                    </div>
+                    <div class="d-flex gap-2 mb-1 align-items-center">
+                        <span class="badge bg-danger">RECHAZADO</span>
+                        <span>La publicación ha sido rechazada</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </RadzenCard>
+</div>
+
+@code {
+    // Variables para gestionar los datos y el estado
+    private List<PublicacionConsulta> publicaciones;
+    private bool cargando = true;
+    private bool error = false;
+    private string mensajeError = string.Empty;
+
+    /// <summary>
+    /// Método que se ejecuta al inicializar el componente
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+        await CargarPublicaciones();
+    }
+
+    /// <summary>
+    /// Carga la lista de todas las publicaciones desde la API
+    /// </summary>
+    private async Task CargarPublicaciones()
+    {
+        cargando = true;
+        error = false;
+        StateHasChanged();
+
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                // Redirigir al login si no hay sesión
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            // Consultar todas las publicaciones
+            publicaciones = await consultarPublicaciones.ObtenerTodasPublicacionesAsync(token);
+
+            if (publicaciones == null)
+            {
+                error = true;
+                mensajeError = "No se pudieron cargar las publicaciones. Por favor, inténtelo de nuevo más tarde.";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = true;
+            mensajeError = $"Error al cargar publicaciones: {ex.Message}";
+            Console.WriteLine($"Error en CargarPublicaciones: {ex}");
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Navega a la página de detalles completos de la publicación
+    /// </summary>
+    private void VerDetallesPublicacion(int idPublicacion)
+    {
+        NavigationManager.NavigateTo($"/administrador/publicaciones/detalle/{idPublicacion}");
+    }
+
+    /// <summary>
+    /// Navega a la página de revisión de la publicación
+    /// </summary>
+    private void VerRevisionPublicacion(int idPublicacion)
+    {
+        NavigationManager.NavigateTo($"/administrador/publicaciones/revision/{idPublicacion}");
+    }
+
+    /// <summary>
+    /// Obtiene la clase CSS para el badge según el estado de la publicación
+    /// </summary>
+    private string GetEstadoClass(string estado)
+    {
+        return estado?.ToLower() switch
+        {
+            "borrador" => "bg-secondary",
+            "en_revision" => "bg-warning text-dark",
+            "solicita_cambios" => "bg-info text-dark",
+            "publicado" => "bg-success",
+            "rechazado" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    /// <summary>
+    /// Obtiene el texto a mostrar según el estado de la publicación
+    /// </summary>
+    private string GetEstadoDisplayText(string estado)
+    {
+        return estado?.ToLower() switch
+        {
+            "borrador" => "BORRADOR",
+            "en_revision" => "EN REVISIÓN",
+            "solicita_cambios" => "CAMBIOS SOLICITADOS",
+            "publicado" => "PUBLICADO",
+            "rechazado" => "RECHAZADO",
+            _ => estado?.ToUpper() ?? "DESCONOCIDO"
+        };
+    }
+}

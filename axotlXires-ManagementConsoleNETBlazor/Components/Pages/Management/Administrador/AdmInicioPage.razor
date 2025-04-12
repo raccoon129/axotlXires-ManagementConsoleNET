@@ -1,0 +1,363 @@
+﻿@page "/administrador/inicio"
+@using System.Net.Http
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@using Radzen
+@using Radzen.Blazor
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject AuthService AuthService
+
+<div class="container-fluid">
+    <h3 class="mb-4">Resumen de Actividad</h3>
+
+    @if (cargando)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+        </div>
+    }
+    else if (error)
+    {
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">Error</h4>
+            <p>@mensajeError</p>
+            <hr>
+            <button class="btn btn-outline-danger" @onclick="CargarDatos">Reintentar</button>
+        </div>
+    }
+    else if (dashboard == null)
+    {
+        <div class="alert alert-warning" role="alert">
+            <h4 class="alert-heading">Sin datos</h4>
+            <p>No se pudieron cargar los datos del dashboard.</p>
+            <hr>
+            <button class="btn btn-outline-warning" @onclick="CargarDatos">Reintentar</button>
+        </div>
+    }
+    else
+    {
+        <!-- Tarjetas de resumen -->
+        <div class="row g-4 mb-4">
+            <!-- Tarjeta de Usuarios -->
+            <div class="col-md-3 col-sm-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="text-muted">Usuarios</h6>
+                                <h3 class="mb-0">@dashboard.Usuarios.TotalUsuarios</h3>
+                                <small class="text-success">+@dashboard.Usuarios.NuevosHoy hoy</small>
+                            </div>
+                            <div class="rounded-circle bg-light p-3">
+                                <i class="bi bi-people-fill fs-3 text-primary"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta de Publicaciones -->
+            <div class="col-md-3 col-sm-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="text-muted">Publicaciones</h6>
+                                <h3 class="mb-0">@dashboard.Publicaciones.TotalPublicaciones</h3>
+                                <small class="text-success">+@dashboard.Publicaciones.CreadasHoy hoy</small>
+                            </div>
+                            <div class="rounded-circle bg-light p-3">
+                                <i class="bi bi-file-earmark-text fs-3 text-success"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta de Interacciones -->
+            <div class="col-md-3 col-sm-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="text-muted">Interacciones</h6>
+                                <h3 class="mb-0">@(dashboard.Interacciones.TotalComentarios + dashboard.Interacciones.TotalFavoritos)</h3>
+                                <small>@dashboard.Interacciones.TotalNotasEstudio notas</small>
+                            </div>
+                            <div class="rounded-circle bg-light p-3">
+                                <i class="bi bi-chat-dots fs-3 text-info"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta de Revisiones -->
+            <div class="col-md-3 col-sm-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="text-muted">Revisiones</h6>
+                                <h3 class="mb-0">@dashboard.Revisiones.TotalRevisiones</h3>
+                                <small class="text-success">@dashboard.Revisiones.Aprobadas aprobadas</small>
+                            </div>
+                            <div class="rounded-circle bg-light p-3">
+                                <i class="bi bi-check-circle fs-3 text-warning"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos simplificados -->
+        <div class="row g-4 mb-4">
+            <!-- Gráfico de usuarios -->
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">Distribución de Usuarios</h5>
+                    </div>
+                    <div class="card-body">
+                        <RadzenChart>
+                            <RadzenPieSeries Data="@GetUsuariosData()" ValueProperty="Valor" CategoryProperty="Categoria"
+                                             Title="Usuarios" Fills="@userColors" />
+                            <RadzenLegend Position="LegendPosition.Right" />
+                        </RadzenChart>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfico de publicaciones -->
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">Estado de Publicaciones</h5>
+                    </div>
+                    <div class="card-body">
+                        <RadzenChart>
+                            <RadzenColumnSeries Data="@GetPublicacionesData()" ValueProperty="Valor" CategoryProperty="Categoria"
+                                                Title="Publicaciones" Fill="#5A2D82" />
+                            <RadzenColumnOptions Radius="5" />
+                            <RadzenValueAxis>
+                                <RadzenGridLines Visible="true" />
+                            </RadzenValueAxis>
+                            <RadzenCategoryAxis>
+                                <RadzenGridLines Visible="false" />
+                            </RadzenCategoryAxis>
+                        </RadzenChart>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detalles en tarjetas -->
+        <div class="row g-4">
+            <!-- Detalles de Usuarios -->
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">Detalles de Usuarios</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Regulares</span>
+                                <span>@dashboard.Usuarios.UsuariosRegulares</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-primary" role="progressbar"
+                                     style="width: @GetPorcentaje(dashboard.Usuarios.UsuariosRegulares, dashboard.Usuarios.TotalUsuarios)%">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Moderadores</span>
+                                <span>@dashboard.Usuarios.Moderadores</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-success" role="progressbar"
+                                     style="width: @GetPorcentaje(dashboard.Usuarios.Moderadores, dashboard.Usuarios.TotalUsuarios)%">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Administradores</span>
+                                <span>@dashboard.Usuarios.Administradores</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-warning" role="progressbar"
+                                     style="width: @GetPorcentaje(dashboard.Usuarios.Administradores, dashboard.Usuarios.TotalUsuarios)%">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detalles de Interacciones -->
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">Interacciones</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <RadzenRadialGauge Style="width: 100%; height: 130px;">
+                                    <RadzenRadialGaugeScale StartAngle="0" EndAngle="360" Step="20" Min="0" Max="100"
+                                                            TickPosition="GaugeTickPosition.None" ShowFirstTick="false" ShowLastTick="false">
+                                        <RadzenRadialGaugeScalePointer Value="@GetInteraccionPorcentaje(dashboard.Interacciones.TotalComentarios)" Length="0.6" />
+                                    </RadzenRadialGaugeScale>
+                                </RadzenRadialGauge>
+                                <h5 class="mt-2">@dashboard.Interacciones.TotalComentarios</h5>
+                                <p class="text-muted">Comentarios</p>
+                            </div>
+                            <div class="col-4">
+                                <RadzenRadialGauge Style="width: 100%; height: 130px;">
+                                    <RadzenRadialGaugeScale StartAngle="0" EndAngle="360" Step="20" Min="0" Max="100"
+                                                            TickPosition="GaugeTickPosition.None" ShowFirstTick="false" ShowLastTick="false">
+                                        <RadzenRadialGaugeScalePointer Value="@GetInteraccionPorcentaje(dashboard.Interacciones.TotalFavoritos)" Length="0.6" />
+                                    </RadzenRadialGaugeScale>
+                                </RadzenRadialGauge>
+                                <h5 class="mt-2">@dashboard.Interacciones.TotalFavoritos</h5>
+                                <p class="text-muted">Favoritos</p>
+                            </div>
+                            <div class="col-4">
+                                <RadzenRadialGauge Style="width: 100%; height: 130px;">
+                                    <RadzenRadialGaugeScale StartAngle="0" EndAngle="360" Step="20" Min="0" Max="100"
+                                                            TickPosition="GaugeTickPosition.None" ShowFirstTick="false" ShowLastTick="false">
+                                        <RadzenRadialGaugeScalePointer Value="@GetInteraccionPorcentaje(dashboard.Interacciones.TotalNotasEstudio)" Length="0.6" />
+                                    </RadzenRadialGaugeScale>
+                                </RadzenRadialGauge>
+                                <h5 class="mt-2">@dashboard.Interacciones.TotalNotasEstudio</h5>
+                                <p class="text-muted">Notas</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private DAL.Modelos.ModeloDashboardAdm? dashboard;
+    private bool cargando = true;
+    private bool error = false;
+    private string mensajeError = string.Empty;
+    private string[] userColors = new string[] { "#5A2D82", "#408ab4", "#e6a23c" };
+
+    protected override void OnInitialized()
+    {
+        // No realizamos operaciones JS aquí
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AuthService.InitializeAsync();
+            await CargarDatos();
+        }
+    }
+
+    private async Task CargarDatos()
+    {
+        cargando = true;
+        error = false;
+        dashboard = null;
+        StateHasChanged();
+
+        try
+        {
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            DAL.Parametros.token = token;
+
+            var servicio = new DAL.Consumo.analyticsRoutes.AnaliticasManagementRoutes(Http);
+            dashboard = await servicio.ObtenerDashboardAsync(token);
+
+            if (dashboard == null)
+            {
+                error = true;
+                mensajeError = "No se pudo obtener la información del dashboard. La sesión podría haber expirado.";
+                await AuthService.CerrarSesion();
+                NavigationManager.NavigateTo("/");
+            }
+        }
+        catch (Exception ex)
+        {
+            error = true;
+            mensajeError = $"Error: {ex.Message}";
+            Console.WriteLine($"Error al cargar dashboard: {ex.Message}");
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    // Método para obtener datos de usuarios para el gráfico
+    private List<ChartDataItem> GetUsuariosData()
+    {
+        if (dashboard == null) return new List<ChartDataItem>();
+
+        return new List<ChartDataItem>
+        {
+            new ChartDataItem { Categoria = "Regulares", Valor = dashboard.Usuarios.UsuariosRegulares },
+            new ChartDataItem { Categoria = "Moderadores", Valor = dashboard.Usuarios.Moderadores },
+            new ChartDataItem { Categoria = "Administradores", Valor = dashboard.Usuarios.Administradores }
+        };
+    }
+
+    // Método para obtener datos de publicaciones para el gráfico
+    private List<ChartDataItem> GetPublicacionesData()
+    {
+        if (dashboard == null) return new List<ChartDataItem>();
+
+        return new List<ChartDataItem>
+        {
+            new ChartDataItem { Categoria = "Publicadas", Valor = dashboard.Publicaciones.Publicadas },
+            new ChartDataItem { Categoria = "En Revisión", Valor = dashboard.Publicaciones.EnRevision },
+            new ChartDataItem { Categoria = "Rechazadas", Valor = dashboard.Publicaciones.Rechazadas }
+        };
+    }
+
+    // Método para calcular porcentajes
+    private int GetPorcentaje(int valor, int total)
+    {
+        if (total == 0) return 0;
+        return (int)Math.Round((double)valor / total * 100);
+    }
+
+    // Método para obtener el porcentaje de interacciones (para los medidores)
+    private double GetInteraccionPorcentaje(int valor)
+    {
+        int total = dashboard?.Interacciones.TotalComentarios +
+                    dashboard?.Interacciones.TotalFavoritos +
+                    dashboard?.Interacciones.TotalNotasEstudio ?? 1;
+
+        if (total == 0) return 0;
+        return Math.Round((double)valor / total * 100);
+    }
+
+    // Clase para los datos de los gráficos
+    public class ChartDataItem
+    {
+        public string Categoria { get; set; }
+        public int Valor { get; set; }
+    }
+}

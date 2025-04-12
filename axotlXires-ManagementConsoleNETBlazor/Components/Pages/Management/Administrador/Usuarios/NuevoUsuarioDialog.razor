@@ -1,0 +1,132 @@
+﻿@using DAL.Modelos
+@using DAL.Consumo
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@inject AuthService AuthService
+@inject DialogService DialogService
+
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <label>Nombre completo:</label>
+            <RadzenTextBox @bind-Value="nuevoUsuario.Nombre"
+                           Style="width: 100%; margin-top: 5px;"
+                           Placeholder="Ingrese nombre completo" />
+
+            <label class="mt-2">Correo electrónico:</label>
+            <RadzenTextBox @bind-Value="nuevoUsuario.Correo"
+                           Style="width: 100%; margin-top: 5px;"
+                           Placeholder="Ingrese correo electrónico" />
+
+            <label class="mt-2">Contraseña:</label>
+            <RadzenPassword @bind-Value="nuevoUsuario.Contrasena"
+                            Style="width: 100%; margin-top: 5px;"
+                            Placeholder="Ingrese contraseña" />
+
+            <label class="mt-2">Rol:</label>
+            <RadzenDropDown @bind-Value="nuevoUsuario.Rol"
+                            Data="@roles"
+                            Style="width: 100%; margin-top: 5px;"
+                            Placeholder="Seleccione un rol" />
+
+            <label class="mt-2">Nombramiento o cargo:</label>
+            <RadzenTextBox @bind-Value="nuevoUsuario.Nombramiento"
+                           Style="width: 100%; margin-top: 5px;"
+                           Placeholder="Ej: Profesor, Investigador, etc." />
+
+            @if (!string.IsNullOrEmpty(mensajeError))
+            {
+                <div class="alert alert-danger mt-3">@mensajeError</div>
+            }
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-6">
+            <RadzenButton Text="Cancelar"
+                          ButtonStyle="ButtonStyle.Light"
+                          Click="@(() => DialogService.Close(false))"
+                          Style="width: 100%;" />
+        </div>
+        <div class="col-6">
+            <RadzenButton Text="Crear Usuario"
+                          ButtonStyle="ButtonStyle.Success"
+                          Click="@CrearUsuario"
+                          Style="width: 100%;"
+                          Disabled="@(cargando || string.IsNullOrEmpty(nuevoUsuario.Nombre) ||
+                                   string.IsNullOrEmpty(nuevoUsuario.Correo) ||
+                                   string.IsNullOrEmpty(nuevoUsuario.Contrasena) ||
+                                   string.IsNullOrEmpty(nuevoUsuario.Rol))" />
+        </div>
+    </div>
+</div>
+
+@code {
+    private NuevoUsuario nuevoUsuario = new NuevoUsuario();
+    private string mensajeError;
+    private bool cargando = false;
+    private List<string> roles = new List<string> { "administrador", "moderador", "revisor", "usuario" };
+
+    /// <summary>
+    /// Crea un nuevo usuario en el sistema
+    /// </summary>
+    private async Task CrearUsuario()
+    {
+        // Validaciones básicas
+        if (string.IsNullOrEmpty(nuevoUsuario.Nombre) ||
+            string.IsNullOrEmpty(nuevoUsuario.Correo) ||
+            string.IsNullOrEmpty(nuevoUsuario.Contrasena) ||
+            string.IsNullOrEmpty(nuevoUsuario.Rol))
+        {
+            mensajeError = "Todos los campos marcados son obligatorios";
+            return;
+        }
+
+        if (nuevoUsuario.Contrasena.Length < 8)
+        {
+            mensajeError = "La contraseña debe tener al menos 8 caracteres";
+            return;
+        }
+
+        if (!nuevoUsuario.Correo.Contains("@") || !nuevoUsuario.Correo.Contains("."))
+        {
+            mensajeError = "El correo electrónico no es válido";
+            return;
+        }
+
+        cargando = true;
+        mensajeError = string.Empty;
+
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                mensajeError = "Su sesión ha expirado";
+                return;
+            }
+
+            // Llamar a la API para crear el usuario
+            var respuesta = await gestionUsuarios.CrearUsuarioAsync(token, nuevoUsuario);
+
+            if (respuesta.Status == "success")
+            {
+                // Cerrar el diálogo y retornar éxito
+                DialogService.Close(true);
+            }
+            else
+            {
+                mensajeError = respuesta.Mensaje ?? "Error al crear el usuario";
+            }
+        }
+        catch (Exception ex)
+        {
+            mensajeError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+}

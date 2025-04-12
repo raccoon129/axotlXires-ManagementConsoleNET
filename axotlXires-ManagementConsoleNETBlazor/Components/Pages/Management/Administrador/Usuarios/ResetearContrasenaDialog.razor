@@ -1,0 +1,207 @@
+﻿@using DAL.Modelos
+@using DAL.Consumo
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@using System.Text
+@inject AuthService AuthService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject IJSRuntime JSRuntime
+
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h5>Nombre del usuario:</h5>
+            <p class="text-primary">@NombreUsuario</p>
+
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            @if (!contrasenaGenerada)
+            {
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Se generará una contraseña aleatoria de 10 caracteres que deberá ser proporcionada al usuario.
+                </div>
+
+                <div class="d-grid gap-2 mt-3">
+                    <RadzenButton Text="Generar Contraseña Aleatoria"
+                                  Icon="password"
+                                  ButtonStyle="ButtonStyle.Secondary"
+                                  Click="@SolicitarConfirmacion"
+                                  Style="width: 100%;" />
+                </div>
+            }
+            else
+            {
+                <label>Contraseña generada:</label>
+                <div class="input-group mb-3 col-3">
+                    <RadzenTextBox @bind-Value="nuevaContrasena"
+                                   ReadOnly="true"
+                                   Style="width: 100%;" />
+                    <RadzenButton Icon="content_copy"
+                                  Click="@CopiarContrasena"
+                                  ButtonStyle="ButtonStyle.Secondary"
+                                  Title="Copiar contraseña" />
+                </div>
+
+                <div class="alert alert-success mt-3">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <strong>¡Contraseña generada con éxito!</strong>
+                    <p class="mb-0 mt-2">Por favor, proporcione esta contraseña al usuario mediante correo electrónico.</p>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(mensajeError))
+            {
+                <div class="alert alert-danger mt-3">@mensajeError</div>
+            }
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-6">
+            <RadzenButton Text="Cerrar"
+                          ButtonStyle="ButtonStyle.Light"
+                          Click="@(() => DialogService.Close(false))"
+                          Style="width: 100%;" />
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int IdUsuario { get; set; }
+    [Parameter] public string NombreUsuario { get; set; }
+
+    private string nuevaContrasena;
+    private string mensajeError;
+    private bool cargando = false;
+    private bool contrasenaGenerada = false;
+
+    /// <summary>
+    /// Muestra un diálogo de confirmación antes de generar la contraseña
+    /// </summary>
+    private async Task SolicitarConfirmacion()
+    {
+        var confirmacion = await DialogService.Confirm(
+            "¿Está seguro que desea generar una nueva contraseña para este usuario?",
+            "Confirmar reseteo de contraseña",
+            new ConfirmOptions() { OkButtonText = "Sí", CancelButtonText = "No" });
+
+        if (confirmacion == true)
+        {
+            await GenerarYGuardarContrasena();
+        }
+    }
+
+    /// <summary>
+    /// Genera una contraseña aleatoria de 10 caracteres y la guarda en la base de datos
+    /// </summary>
+    private async Task GenerarYGuardarContrasena()
+    {
+        cargando = true;
+        mensajeError = string.Empty;
+
+        try
+        {
+            // Generar la contraseña aleatoria
+            nuevaContrasena = GenerarContrasenaAleatoria(10);
+
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                mensajeError = "Su sesión ha expirado";
+                return;
+            }
+
+            // Llamar a la API para resetear la contraseña
+            var respuesta = await gestionUsuarios.RestablecerContrasenaAsync(token, IdUsuario, nuevaContrasena);
+
+            if (respuesta.Status == "success")
+            {
+                // Marcar como generada exitosamente
+                contrasenaGenerada = true;
+            }
+            else
+            {
+                mensajeError = respuesta.Mensaje ?? "Error al resetear la contraseña";
+            }
+        }
+        catch (Exception ex)
+        {
+            mensajeError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    /// <summary>
+    /// Genera una contraseña aleatoria con la longitud especificada
+    /// </summary>
+    private string GenerarContrasenaAleatoria(int longitud)
+    {
+        // Definir los conjuntos de caracteres para mayor seguridad
+        const string letrasMinusculas = "abcdefghijklmnopqrstuvwxyz";
+        const string letrasMayusculas = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const string numeros = "0123456789";
+        const string simbolos = "!@#$%^&*()_-+=<>?";
+
+        // Combinar todos los conjuntos
+        string caracteresPermitidos = letrasMinusculas + letrasMayusculas + numeros + simbolos;
+
+        // Utilizar un generador de números aleatorios seguro
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        byte[] data = new byte[longitud];
+        rng.GetBytes(data);
+
+        // Construir la contraseña
+        StringBuilder resultado = new StringBuilder(longitud);
+
+        // Asegurar que hay al menos un carácter de cada tipo
+        resultado.Append(letrasMinusculas[data[0] % letrasMinusculas.Length]);
+        resultado.Append(letrasMayusculas[data[1] % letrasMayusculas.Length]);
+        resultado.Append(numeros[data[2] % numeros.Length]);
+        resultado.Append(simbolos[data[3] % simbolos.Length]);
+
+        // Completar con caracteres aleatorios
+        for (int i = 4; i < longitud; i++)
+        {
+            resultado.Append(caracteresPermitidos[data[i] % caracteresPermitidos.Length]);
+        }
+
+        // Mezclar los caracteres para que no siempre siga el mismo patrón
+        return MezclarCadena(resultado.ToString());
+    }
+
+    /// <summary>
+    /// Mezcla los caracteres de una cadena aleatoriamente
+    /// </summary>
+    private string MezclarCadena(string cadena)
+    {
+        char[] caracteres = cadena.ToCharArray();
+        Random rnd = new Random();
+
+        for (int i = caracteres.Length - 1; i > 0; i--)
+        {
+            int j = rnd.Next(0, i + 1);
+
+            // Intercambiar caracteres
+            (caracteres[i], caracteres[j]) = (caracteres[j], caracteres[i]);
+        }
+
+        return new string(caracteres);
+    }
+
+    /// <summary>
+    /// Copia la contraseña generada al portapapeles
+    /// </summary>
+    private async Task CopiarContrasena()
+    {
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", nuevaContrasena);
+        NotificationService.Notify(NotificationSeverity.Success, "Copiado", "Contraseña copiada al portapapeles");
+    }
+}
