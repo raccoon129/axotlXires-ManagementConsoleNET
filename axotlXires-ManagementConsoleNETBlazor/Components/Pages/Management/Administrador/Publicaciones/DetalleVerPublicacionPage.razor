@@ -1,0 +1,117 @@
+﻿@page "/administrador/publicaciones/detalle/{IdPublicacion:int}"
+@using DAL.Modelos
+@using DAL.Consumo
+@using System.Text.Json
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@using DAL
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject NotificationService NotificationService
+@inject IJSRuntime JSRuntime
+
+<div class="container-fluid">
+    <h3 class="mb-4">Detalle de Publicación</h3>
+
+    <div class="d-flex justify-content-end mb-4 gap-2">
+        <RadzenButton Text="Ver Inmersivo" Icon="open_in_new"
+                      Click="@AbrirVisualizacionInmersiva"
+                      ButtonStyle="ButtonStyle.Secondary" />
+        <RadzenButton Text="Volver" Icon="arrow_back"
+                      Click="@(() => NavigationManager.NavigateTo("/administrador/publicaciones/todas"))"
+                      ButtonStyle="ButtonStyle.Light" />
+    </div>
+
+    @if (cargando)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Primary"
+                                       Value="100"
+                                       ShowValue="false"
+                                       Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+    else if (error)
+    {
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">Error al cargar la publicación</h4>
+            <p>@mensajeError</p>
+            <hr>
+            <RadzenButton Text="Reintentar" Click="@CargarPublicacion" ButtonStyle="ButtonStyle.Secondary" />
+        </div>
+    }
+    else
+    {
+        <RadzenCard>
+            <div class="visualizador-container">
+                <iframe src="@urlVisualizacion"
+                        style="width: 100%; height: 2000px; border: none;"
+                        title="Contenido de la publicación"
+                        allowfullscreen>
+                </iframe>
+            </div>
+        </RadzenCard>
+    }
+</div>
+
+@code {
+    [Parameter] public int IdPublicacion { get; set; }
+
+    private bool cargando = true;
+    private bool error = false;
+    private string mensajeError = string.Empty;
+    private string urlVisualizacion;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+        await CargarPublicacion();
+    }
+
+    private async Task CargarPublicacion()
+    {
+        cargando = true;
+        error = false;
+        StateHasChanged();
+
+        try
+        {
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            // Construimos la URL para visualizar la publicación
+            urlVisualizacion = $"{Parametros.UrlBaseApi}/api/management/visualizar/{IdPublicacion}";
+        }
+        catch (Exception ex)
+        {
+            error = true;
+            mensajeError = $"Error al cargar la publicación: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task AbrirVisualizacionInmersiva()
+    {
+        try
+        {
+            // Construir URL para el modo inmersivo con Flipbook
+            string urlFlipbook = $"{Parametros.Flipbook}/?pdfUrl={Parametros.UrlBaseApi}/api/descargas/{IdPublicacion}?visualizar=true";
+
+            // Abrir en nueva pestaña
+            await JSRuntime.InvokeVoidAsync("open", urlFlipbook, "_blank");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error",
+                $"No se pudo abrir la visualización inmersiva: {ex.Message}");
+        }
+    }
+}

@@ -229,10 +229,10 @@ namespace DAL.Modelos
     /// </summary>
     public class TipoRevision
     {
-        [JsonPropertyName("id_tipo_revision")]
+        [JsonPropertyName("id_detalle_revision")]
         public int IdTipoRevision { get; set; }
 
-        [JsonPropertyName("tipo_revision")]
+        [JsonPropertyName("detalle_revision")]
         public string Nombre { get; set; }
 
         [JsonPropertyName("descripcion_revision")]

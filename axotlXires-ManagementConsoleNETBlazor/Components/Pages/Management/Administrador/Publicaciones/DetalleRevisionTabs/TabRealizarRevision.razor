@@ -19,10 +19,12 @@
 
                 @if (!string.IsNullOrEmpty(UrlVisualizacion))
                 {
-                    <iframe src="@UrlVisualizacion"
-                            style="width: 100%; height: calc(100vh - 200px); border: none;"
-                            title="Contenido de la publicación">
-                    </iframe>
+                    <div style="flex-grow: 1; position: relative;">
+                        <iframe src="@UrlVisualizacion"
+                                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;"
+                                title="Contenido de la publicación">
+                        </iframe>
+                    </div>
                 }
                 else
                 {
@@ -292,11 +294,21 @@
         flex: 1;
     }
 
-    /* Contenedor del iframe */
     .contenido-iframe {
         display: flex;
         flex-direction: column;
+        width: 100%;
+        height: 100%; /* Modifica la altura para que se adapte al contenedor */
+        padding: 0;
+        margin: 0;
     }
+
+        .contenido-iframe iframe {
+            width: 100%;
+            height: 100%; /* La altura del iframe se adapta al contenedor */
+            border: none;
+            flex-grow: 1; /* Asegura que el iframe ocupe todo el espacio disponible */
+        }
 </style>
 
 @code {

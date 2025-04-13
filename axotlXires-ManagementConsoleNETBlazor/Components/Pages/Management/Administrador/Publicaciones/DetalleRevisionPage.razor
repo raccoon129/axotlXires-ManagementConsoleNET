@@ -68,7 +68,7 @@
                         <TabRealizarRevision RevisionActiva="@revisionActiva"
                                              TiposRevision="@detallePublicacion.TiposRevision"
                                              IdPublicacion="@IdPublicacion"
-                                             UrlVisualizacion="@($"{Parametros.UrlBaseApi}/api/visualizar/{IdPublicacion}")"
+                                             UrlVisualizacion="@($"{Parametros.UrlBaseApi}/api/management/visualizar/{IdPublicacion}")"
                                              OnFinalizarRevision="FinalizarRevisionHandler"
                                              OnCancelarRevision="@(() => CancelarRevision())"
                                              OnIniciarNuevaRevision="IniciarNuevaRevision" />

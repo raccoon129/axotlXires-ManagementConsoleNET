@@ -26,6 +26,7 @@ namespace DAL
         internal static string ApiBaseAddress = @"http://localhost:3001";
 
         public static string UrlBaseApi { get; set; } = "http://localhost:3001";
+        public static string Flipbook { get; set; } = "http://localhost:3002";
 
     }
 }
