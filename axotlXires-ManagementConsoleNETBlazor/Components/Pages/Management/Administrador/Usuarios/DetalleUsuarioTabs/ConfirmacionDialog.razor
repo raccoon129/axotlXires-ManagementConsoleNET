@@ -1,0 +1,38 @@
+﻿@inject DialogService DialogService
+
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <RadzenIcon Icon="help_outline" Style="font-size: 3rem; color: var(--rz-warning);" />
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <RadzenText TextStyle="TextStyle.H5">@Titulo</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body1" class="mt-2">@Mensaje</RadzenText>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12 d-flex justify-content-end">
+            <RadzenButton Text="@TituloBotonCancelar"
+                          ButtonStyle="@EstiloBotonCancelar"
+                          Click="@(() => DialogService.Close(false))"
+                          Class="me-2" />
+
+            <RadzenButton Text="@TituloBotonConfirmar"
+                          ButtonStyle="@EstiloBotonConfirmar"
+                          Click="@(() => DialogService.Close(true))" />
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Titulo { get; set; } = "Confirmación";
+    [Parameter] public string Mensaje { get; set; } = "¿Está seguro que desea realizar esta acción?";
+    [Parameter] public string TituloBotonCancelar { get; set; } = "Cancelar";
+    [Parameter] public string TituloBotonConfirmar { get; set; } = "Confirmar";
+    [Parameter] public ButtonStyle EstiloBotonCancelar { get; set; } = ButtonStyle.Light;
+    [Parameter] public ButtonStyle EstiloBotonConfirmar { get; set; } = ButtonStyle.Primary;
+}

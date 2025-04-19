@@ -96,6 +96,19 @@
                         </Template>
                     </RadzenDataGridColumn>
 
+                    <RadzenDataGridColumn TItem="UsuarioListado" Property="Activo" Title="Estado" Width="100px" TextAlign="TextAlign.Center">
+                        <Template Context="usuario">
+                            @if (usuario.Activo == 1)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="ACTIVO" />
+                            }
+                            else
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="INACTIVO" />
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+
                     <RadzenDataGridColumn TItem="UsuarioListado" Property="Estadisticas" Title="Publicaciones" Width="150px">
                         <Template Context="usuario">
                             <div>
@@ -132,7 +145,7 @@
                     </RadzenDataGridColumn>
 
 
-                    <RadzenDataGridColumn TItem="UsuarioListado" Title="Acciones" Width="180px" Sortable="false" Filterable="false">
+                    <RadzenDataGridColumn TItem="UsuarioListado" Title="Acciones" Width="220px" Sortable="false" Filterable="false">
                         <Template Context="usuario">
                             <RadzenButton Icon="person" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
                                           Click="@(() => VerDetallesUsuario(usuario.IdUsuario))"
@@ -141,7 +154,6 @@
                             <RadzenButton Icon="key" ButtonStyle="ButtonStyle.Warning" Size="ButtonSize.Small"
                                           Click="@(() => AbrirModalResetearContrasena(usuario))"
                                           Variant="Variant.Flat" Title="Resetear contraseña" />
-
                         </Template>
                     </RadzenDataGridColumn>
                 </Columns>
@@ -344,10 +356,10 @@
     {
         var resultado = await DialogService.OpenAsync<ResetearContrasenaDialog>("Resetear Contraseña",
             new Dictionary<string, object>
-                        {
+                            {
                 { "IdUsuario", usuario.IdUsuario },
                 { "NombreUsuario", usuario.Nombre }
-                        },
+                            },
             new DialogOptions { Width = "700px", Height = "500px", CloseDialogOnOverlayClick = false });
 
         if (resultado != null && (bool)resultado == true)
@@ -371,4 +383,5 @@
             NotificationService.Notify(NotificationSeverity.Success, "Éxito", "Usuario creado correctamente");
         }
     }
+
 }

@@ -1,0 +1,642 @@
+﻿@page "/administrador/usuarios/{IdUsuario:int}"
+@using DAL.Modelos
+@using DAL.Consumo
+@using System.IO
+@using System.Text.Json
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@using axotlXires_ManagementConsoleNETBlazor.Components.Pages.Management.Administrador.Usuarios.DetalleUsuarioTabs
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <RadzenBreadCrumb>
+                <RadzenBreadCrumbItem Text="Inicio" Path="/administrador/inicio" />
+                <RadzenBreadCrumbItem Text="Usuarios" Path="/administrador/usuarios" />
+                <RadzenBreadCrumbItem Text="Detalle de Usuario" />
+            </RadzenBreadCrumb>
+            <h3 class="mt-2">Detalle de Usuario</h3>
+        </div>
+        <div>
+            <RadzenButton Icon="arrow_back" Text="Volver" Click="@VolverALista" ButtonStyle="ButtonStyle.Light" />
+        </div>
+    </div>
+
+    @if (cargando)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Primary" Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+    else if (error)
+    {
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">Error al cargar el usuario</h4>
+            <p>@mensajeError</p>
+            <hr>
+            <div class="d-flex">
+                <RadzenButton Text="Volver" Icon="arrow_back" Click="@VolverALista" ButtonStyle="ButtonStyle.Secondary" Class="me-2" />
+                <RadzenButton Text="Reintentar" Icon="refresh" Click="@CargarDetalleUsuario" ButtonStyle="ButtonStyle.Primary" />
+            </div>
+        </div>
+    }
+    else if (usuario != null)
+    {
+        <RadzenTabs>
+            <Tabs>
+                <!-- Tab 1: Información general -->
+                <RadzenTabsItem Text="Información general" Icon="person" Selected="!modoEdicion">
+                    <InformacionGeneralTab Usuario="@usuario" 
+                                        ImagenPerfilBase64="@imagenPerfilBase64"
+                                        EsUsuarioEditable="@esUsuarioEditable"
+                                        OnModoEdicionCambio="@(() => modoEdicion = true)"
+                                        OnResetearContrasena="@AbrirModalResetearContrasena"
+                                        OnCambiarActivacion="@CambiarActivacionUsuario"
+                                        OnMostrarDialogoRestablecerFoto="@MostrarDialogoRestablecerFoto"
+                                        ObtenerEstiloPorRol="@ObtenerEstiloPorRol"
+                                        ObtenerEstiloPorEstadoPublicacion="@ObtenerEstiloPorEstadoPublicacion" />
+                </RadzenTabsItem>
+
+                <!-- Tab 2: Editar información -->
+                <RadzenTabsItem Text="Editar información" Icon="edit" Selected="modoEdicion" Visible="esUsuarioEditable">
+                    <EditarInformacionTab NombreEdicion="@nombreEdicion" 
+                                        NombramientoEdicion="@nombramientoEdicion"
+                                        RolEdicion="@rolEdicion"
+                                        RolesDisponibles="@rolesDisponibles"
+                                        OnNombreEdicionCambio="@((valor) => nombreEdicion = valor)"
+                                        OnNombramientoEdicionCambio="@((valor) => nombramientoEdicion = valor)"
+                                        OnRolEdicionCambio="@((valor) => rolEdicion = valor)"
+                                        OnCancelar="@CancelarEdicion"
+                                        OnGuardar="@GuardarCambios" />
+                </RadzenTabsItem>
+
+                <!-- Tab 3: Comentarios -->
+                <RadzenTabsItem Text="Comentarios" Icon="comment">
+                    <ComentariosTab CargandoComentarios="@cargandoComentarios"
+                                    ComentariosDetallados="@comentariosDetallados"
+                                    OnComentarioEliminado="@OnComentarioEliminado" />
+                </RadzenTabsItem>
+
+
+                <!-- Tab 4: Notificaciones -->
+                <RadzenTabsItem Text="Notificaciones" Icon="notifications">
+                    <NotificacionesTab CargandoNotificaciones="@cargandoNotificaciones"
+                                     NotificacionesEstado="@notificacionesEstado"
+                                     Usuario="@usuario"
+                                     ObtenerIconoNotificacion="@ObtenerIconoNotificacion"
+                                     ObtenerColorNotificacion="@ObtenerColorNotificacion" />
+                </RadzenTabsItem>
+            </Tabs>
+        </RadzenTabs>
+    }
+    else
+    {
+        <div class="alert alert-warning" role="alert">
+            <h4 class="alert-heading">Usuario no encontrado</h4>
+            <p>No se pudo cargar la información del usuario solicitado.</p>
+            <hr>
+            <RadzenButton Text="Volver al listado" Click="@VolverALista" ButtonStyle="ButtonStyle.Primary" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int IdUsuario { get; set; }
+
+    // Variables de estado
+    private bool cargando = true;
+    private bool error = false;
+    private string mensajeError;
+    private bool modoEdicion = false;
+    private UsuarioDetalle usuario;
+    private string imagenPerfilBase64;
+
+    // Variables para edición
+    private string nombreEdicion;
+    private string nombramientoEdicion;
+    private string rolEdicion;
+    private bool esUsuarioEditable => usuario?.Rol.ToLower() != "administrador";
+
+    // Variables para datos adicionales
+    private DatosComentariosUsuario comentariosDetallados;
+    private bool cargandoComentarios = false;
+
+    private DatosNotificacionesEstado notificacionesEstado;
+    private bool cargandoNotificaciones = false;
+
+    // Lista de roles disponibles para selección
+    private List<dynamic> rolesDisponibles = new List<dynamic>
+    {
+        new { Text = "Usuario", Value = "usuario" },
+        new { Text = "Revisor", Value = "revisor" },
+        new { Text = "Moderador", Value = "moderador" }
+    };
+
+    /// <summary>
+    /// Inicialización del componente
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDetalleUsuario();
+
+        // Si la carga del perfil fue exitosa, cargamos inmediatamente las notificaciones y comentarios
+        if (usuario != null && !error)
+        {
+            // Iniciamos la carga en background
+            _ = Task.WhenAll(
+                CargarNotificacionesEstado(),
+                CargarComentariosDetallados()
+            );
+        }
+    }
+
+    /// <summary>
+    /// Carga los detalles del usuario seleccionado
+    /// </summary>
+    private async Task CargarDetalleUsuario()
+    {
+        cargando = true;
+        error = false;
+        StateHasChanged();
+
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/"); // Redirigir al login si no hay sesión
+                return;
+            }
+
+            // Cargar detalles del usuario
+            usuario = await gestionUsuarios.ObtenerDetalleUsuarioAsync(token, IdUsuario);
+
+            if (usuario != null)
+            {
+                // Inicializar campos de edición
+                nombreEdicion = usuario.Nombre;
+                nombramientoEdicion = usuario.Nombramiento;
+                rolEdicion = usuario.Rol.ToLower();
+
+                // Cargar la imagen de perfil
+                await CargarImagenPerfil(token);
+            }
+            else
+            {
+                error = true;
+                mensajeError = "No se pudo obtener la información del usuario. Puede que no exista o no tenga permisos para acceder a él.";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = true;
+            mensajeError = $"Error al cargar detalles: {ex.Message}";
+            Console.WriteLine($"Error en CargarDetalleUsuario: {ex}");
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Carga la imagen de perfil del usuario
+    /// </summary>
+    private async Task CargarImagenPerfil(string token)
+    {
+        if (usuario == null) return;
+
+        try
+        {
+            // Crear instancia del servicio de consulta de imágenes
+            var servicioImagenes = new consultarImagenes();
+
+            // Obtener la imagen como bytes
+            var imagenBytes = await servicioImagenes.ObtenerImagenPerfilBytesAsync(token, usuario.IdUsuario);
+
+            if (imagenBytes != null && imagenBytes.Length > 0)
+            {
+                // Convertir a Base64 para mostrar en la imagen
+                imagenPerfilBase64 = Convert.ToBase64String(imagenBytes);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar imagen de perfil: {ex.Message}");
+            // No bloqueamos la carga del resto de la página si falla la imagen
+        }
+    }
+
+    /// <summary>
+    /// Carga comentarios detallados del usuario
+    /// </summary>
+    private async Task CargarComentariosDetallados()
+    {
+        if (usuario == null) return;
+
+        cargandoComentarios = true;
+        StateHasChanged();
+
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+            if (string.IsNullOrEmpty(token))
+            {
+                return;
+            }
+
+            // Obtener comentarios detallados
+            comentariosDetallados = await gestionUsuarios.ObtenerComentariosUsuarioAsync(token, usuario.IdUsuario);
+
+            if (comentariosDetallados == null)
+            {
+                // Si no se pudieron cargar los comentarios detallados, registramos el evento
+                Console.WriteLine("No se pudieron cargar los comentarios detallados del usuario");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar comentarios detallados: {ex.Message}");
+            // No mostramos notificación de error para no interrumpir la experiencia del usuario
+        }
+        finally
+        {
+            cargandoComentarios = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Carga notificaciones con estado de atención
+    /// </summary>
+    private async Task CargarNotificacionesEstado()
+    {
+        if (usuario == null) return;
+
+        cargandoNotificaciones = true;
+        StateHasChanged();
+
+        try
+        {
+            string token = await AuthService.ObtenerToken();
+            if (string.IsNullOrEmpty(token))
+            {
+                return;
+            }
+
+            notificacionesEstado = await gestionUsuarios.ObtenerNotificacionesEstadoUsuarioAsync(token, usuario.IdUsuario);
+
+            if (notificacionesEstado == null)
+            {
+                // Si no se pudieron cargar las notificaciones con estado, usamos silenciosamente
+                // las notificaciones básicas que ya vienen con el usuario
+                Console.WriteLine("No se pudieron cargar las notificaciones con estado de atención");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar notificaciones con estado: {ex.Message}");
+            // No mostramos notificación de error para no interrumpir la experiencia del usuario
+        }
+        finally
+        {
+            cargandoNotificaciones = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Muestra un diálogo para confirmar el restablecimiento de la foto de perfil
+    /// </summary>
+    private async Task MostrarDialogoRestablecerFoto()
+    {
+        // Mostrar diálogo de confirmación
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+            "¿Está seguro de que desea restablecer la foto de perfil a la imagen predeterminada?");
+
+        if (confirmed)
+        {
+            await RestablecerFotoPerfil();
+        }
+    }
+
+    /// <summary>
+    /// Restablece la foto de perfil del usuario a la imagen predeterminada
+    /// </summary>
+    private async Task RestablecerFotoPerfil()
+    {
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            // Llamar al servicio para restablecer la foto
+            var respuesta = await gestionUsuarios.RestablecerFotoPerfilUsuarioAsync(token, usuario.IdUsuario);
+
+            if (respuesta != null && respuesta.Status == "success")
+            {
+                // Recargar la foto de perfil
+                imagenPerfilBase64 = null; // Limpiar la imagen actual
+                await CargarImagenPerfil(token); // Cargar la nueva imagen predeterminada
+
+                NotificationService.Notify(NotificationSeverity.Success, "Éxito",
+                    "Foto de perfil restablecida correctamente");
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error",
+                    respuesta?.Mensaje ?? "No se pudo restablecer la foto de perfil");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error",
+                $"Error al restablecer foto de perfil: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Guarda los cambios realizados en la información del usuario
+    /// </summary>
+    private async Task GuardarCambios()
+    {
+        if (string.IsNullOrWhiteSpace(nombreEdicion))
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Validación", "El nombre no puede estar vacío.");
+            return;
+        }
+
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/"); // Redirigir al login si no hay sesión
+                return;
+            }
+
+            // Actualizar los detalles del usuario
+            var respuesta = await gestionUsuarios.ActualizarDetallesUsuarioAsync(
+                token, usuario.IdUsuario, nombreEdicion, nombramientoEdicion, rolEdicion);
+
+            if (respuesta != null && respuesta.Status == "success")
+            {
+                // Actualizar los datos locales y mostrar notificación
+                usuario.Nombre = nombreEdicion;
+                usuario.Nombramiento = nombramientoEdicion;
+                usuario.Rol = rolEdicion;
+
+                NotificationService.Notify(NotificationSeverity.Success, "Éxito", "Información actualizada correctamente");
+                modoEdicion = false; // Salir del modo edición
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error",
+                    respuesta?.Mensaje ?? "No se pudo actualizar la información del usuario");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error al guardar cambios: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Cancela la edición y restaura los valores originales
+    /// </summary>
+    private void CancelarEdicion()
+    {
+        nombreEdicion = usuario.Nombre;
+        nombramientoEdicion = usuario.Nombramiento;
+        rolEdicion = usuario.Rol.ToLower();
+        modoEdicion = false;
+    }
+
+    /// <summary>
+    /// Navega de vuelta a la lista de usuarios
+    /// </summary>
+    private void VolverALista()
+    {
+        NavigationManager.NavigateTo("/administrador/usuarios");
+    }
+
+    /// <summary>
+    /// Cambia el estado de activación del usuario
+    /// </summary>
+    private async Task CambiarActivacionUsuario(int nuevoEstado)
+    {
+        // Validar que no se intente cambiar a un administrador
+        if (usuario.Rol.ToLower() == "administrador")
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Operación no permitida",
+                "No se puede cambiar el estado de activación de un administrador");
+            return;
+        }
+
+        // Solicitar confirmación antes de proceder
+        bool confirmado = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"¿Está seguro que desea {(nuevoEstado == 1 ? "activar" : "desactivar")} al usuario {usuario.Nombre}?");
+
+        if (!confirmado)
+            return;
+
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            // Llamar al servicio para cambiar el estado de activación
+            var respuesta = await gestionUsuarios.CambiarActivacionUsuarioAsync(token, usuario.IdUsuario, nuevoEstado);
+
+            if (respuesta != null && respuesta.Status == "success")
+            {
+                // Actualizar el estado en el modelo local
+                usuario.Activo = nuevoEstado;
+
+                NotificationService.Notify(NotificationSeverity.Success, "Éxito",
+                    nuevoEstado == 1
+                        ? "Usuario activado correctamente"
+                        : "Usuario desactivado correctamente");
+
+                StateHasChanged();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error",
+                    respuesta?.Mensaje ?? "No se pudo cambiar el estado del usuario");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error",
+                $"Error al cambiar estado del usuario: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Abre un diálogo para resetear la contraseña del usuario
+    /// </summary>
+    private async Task AbrirModalResetearContrasena()
+    {
+        var resultado = await DialogService.OpenAsync<ResetearContrasenaDialog>("Resetear Contraseña",
+            new Dictionary<string, object>
+                    {
+                { "IdUsuario", usuario.IdUsuario },
+                { "NombreUsuario", usuario.Nombre }
+                    },
+            new DialogOptions { Width = "500px", Height = "400px", CloseDialogOnOverlayClick = false });
+
+        if (resultado != null && (bool)resultado == true)
+        {
+            NotificationService.Notify(NotificationSeverity.Success, "Éxito", "Contraseña restablecida correctamente");
+        }
+    }
+
+    /// <summary>
+    /// Determina el estilo del badge según el rol del usuario
+    /// </summary>
+    private BadgeStyle ObtenerEstiloPorRol(string rol)
+    {
+        return rol.ToLower() switch
+        {
+            "administrador" => BadgeStyle.Danger,
+            "moderador" => BadgeStyle.Warning,
+            "revisor" => BadgeStyle.Success,
+            _ => BadgeStyle.Info
+        };
+    }
+
+    /// <summary>
+    /// Determina el estilo del badge según el estado de la publicación
+    /// </summary>
+    private BadgeStyle ObtenerEstiloPorEstadoPublicacion(string estado)
+    {
+        return estado.ToLower() switch
+        {
+            "publicada" => BadgeStyle.Success,
+            "revisión" or "pendiente" => BadgeStyle.Warning,
+            "rechazada" => BadgeStyle.Danger,
+            "borrador" => BadgeStyle.Light,
+            _ => BadgeStyle.Info
+        };
+    }
+
+    /// <summary>
+    /// Obtiene el icono según el tipo de notificación
+    /// </summary>
+    private string ObtenerIconoNotificacion(string tipo)
+    {
+        return tipo.ToLower() switch
+        {
+            "comentario" => "comment",
+            "sistema" => "computer",
+            "revisión" => "rate_review",
+            "publicación" => "article",
+            "favorito" => "star",
+            "perfil" => "person",
+            _ => "notifications"
+        };
+    }
+
+    /// <summary>
+    /// Obtiene el color según el tipo de notificación
+    /// </summary>
+    private string ObtenerColorNotificacion(string tipo)
+    {
+        return tipo.ToLower() switch
+        {
+            "comentario" => "var(--rz-info)",
+            "sistema" => "var(--rz-danger)",
+            "revisión" => "var(--rz-warning)",
+            "publicación" => "var(--rz-success)",
+            "favorito" => "var(--rz-warning)",
+            "perfil" => "var(--rz-primary)",
+            _ => "var(--rz-secondary)"
+        };
+    }
+
+    /// <summary>
+    /// Maneja el evento cuando un comentario es eliminado
+    /// </summary>
+    private void OnComentarioEliminado(int idComentario)
+    {
+        // Actualizar estadísticas
+        if (usuario != null && usuario.Estadisticas != null)
+        {
+            usuario.Estadisticas.TotalComentarios--;
+        }
+
+        // Actualizar los comentarios recientes si el comentario eliminado estaba allí
+        if (usuario.ComentariosRecientes != null)
+        {
+            var comentarioReciente = usuario.ComentariosRecientes.FirstOrDefault(c => c.IdComentario == idComentario);
+            if (comentarioReciente != null)
+            {
+                usuario.ComentariosRecientes.Remove(comentarioReciente);
+            }
+        }
+    }
+
+}
+
+<style>
+    /* Estilos adicionales para la página de detalle de usuario */
+    .card-title {
+        font-weight: 600;
+    }
+
+    .border-success {
+        border-left: 4px solid var(--rz-success) !important;
+    }
+
+    .border-warning {
+        border-left: 4px solid var(--rz-warning) !important;
+    }
+
+    .border-danger {
+        border-left: 4px solid var(--rz-danger) !important;
+    }
+
+    .border-secondary {
+        border-left: 4px solid var(--rz-secondary) !important;
+    }
+
+    /* Estilos para la presentación de tarjetas de comentarios y notificaciones */
+    .card-header {
+        padding: 0.75rem 1.25rem;
+        background-color: rgba(0,0,0,.03);
+    }
+
+    .card-body {
+        padding: 1.25rem;
+    }
+
+    /* Botón para restablecer foto de perfil */
+    .position-absolute.bottom-0.end-0 .btn {
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>

@@ -1,0 +1,48 @@
+﻿<RadzenCard class="mt-4">
+    <h4 class="mb-4">Editar información de usuario</h4>
+
+    <div class="mb-3">
+        <label class="form-label">Nombre completo</label>
+        <RadzenTextBox Value="@NombreEdicion"
+                       ValueChanged="@(val => OnNombreEdicionCambio.InvokeAsync(val))"
+                       Class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Cargo / Nombramiento</label>
+        <RadzenTextBox Value="@NombramientoEdicion"
+                       ValueChanged="@(val => OnNombramientoEdicionCambio.InvokeAsync(val))"
+                       Class="form-control" />
+    </div>
+
+    <div class="mb-4">
+        <label class="form-label">Rol</label>
+        <RadzenDropDown TValue="string"
+                        Value="@RolEdicion"
+                        ValueChanged="@(val => OnRolEdicionCambio.InvokeAsync(val))"
+                        Data="@RolesDisponibles"
+                        TextProperty="Text"
+                        ValueProperty="Value"
+                        Class="form-control"
+                        Style="width:100%" />
+        <small class="text-muted">El usuario no debe ser administrador para cambiar su rol.</small>
+    </div>
+
+    <div class="d-flex justify-content-end">
+        <RadzenButton Text="Cancelar" Click="@OnCancelar" ButtonStyle="ButtonStyle.Light" Class="me-2" />
+        <RadzenButton Text="Guardar cambios" Click="@OnGuardar" ButtonStyle="ButtonStyle.Primary" />
+    </div>
+</RadzenCard>
+
+@code {
+    [Parameter] public string NombreEdicion { get; set; }
+    [Parameter] public string NombramientoEdicion { get; set; }
+    [Parameter] public string RolEdicion { get; set; }
+    [Parameter] public List<dynamic> RolesDisponibles { get; set; }
+
+    [Parameter] public EventCallback<string> OnNombreEdicionCambio { get; set; }
+    [Parameter] public EventCallback<string> OnNombramientoEdicionCambio { get; set; }
+    [Parameter] public EventCallback<string> OnRolEdicionCambio { get; set; }
+    [Parameter] public EventCallback OnCancelar { get; set; }
+    [Parameter] public EventCallback OnGuardar { get; set; }
+}

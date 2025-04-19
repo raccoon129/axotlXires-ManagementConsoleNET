@@ -1,0 +1,143 @@
+﻿@using DAL.Modelos
+
+<RadzenCard class="mt-4">
+    <h4 class="mb-4">Notificaciones del usuario</h4>
+
+    @if (CargandoNotificaciones)
+    {
+        <div class="d-flex justify-content-center my-4">
+            <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Warning" Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+    else if (NotificacionesEstado != null && NotificacionesEstado.Notificaciones != null && NotificacionesEstado.Notificaciones.Any())
+    {
+        <!-- Panel de estadísticas de notificaciones -->
+        <RadzenRow class="mb-4">
+            <RadzenCol Size="12" SizeMD="4">
+                <RadzenCard class="text-center">
+                    <h5 class="mb-0">@NotificacionesEstado.Estadisticas.Total</h5>
+                    <RadzenText TextStyle="TextStyle.Subtitle2" class="text-muted mb-0">Total notificaciones</RadzenText>
+                </RadzenCard>
+            </RadzenCol>
+            <RadzenCol Size="12" SizeMD="4">
+                <RadzenCard class="text-center bg-success-light">
+                    <h5 class="mb-0 text-success">@NotificacionesEstado.Estadisticas.Atendidas</h5>
+                    <RadzenText TextStyle="TextStyle.Subtitle2" class="text-muted mb-0">Atendidas</RadzenText>
+                </RadzenCard>
+            </RadzenCol>
+            <RadzenCol Size="12" SizeMD="4">
+                <RadzenCard class="text-center bg-warning-light">
+                    <h5 class="mb-0 text-warning">@NotificacionesEstado.Estadisticas.Pendientes</h5>
+                    <RadzenText TextStyle="TextStyle.Subtitle2" class="text-muted mb-0">Pendientes</RadzenText>
+                </RadzenCard>
+            </RadzenCol>
+        </RadzenRow>
+
+        <!-- Lista de notificaciones -->
+        <RadzenDataList Data="@NotificacionesEstado.Notificaciones" 
+                      TItem="NotificacionConEstado" 
+                      AllowPaging="true" 
+                      PageSize="5"
+                      WrapItems="true">
+            <Template Context="notificacion">
+                <RadzenCard Class="@($"mb-3 {(notificacion.EstadoAtencion == "pendiente" ? "border-warning" : "border-success")}")">
+                    <RadzenRow>
+                        <RadzenCol Size="12">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <RadzenIcon Icon="@ObtenerIconoNotificacion(notificacion.Tipo)" 
+                                              Style="@($"color: {ObtenerColorNotificacion(notificacion.Tipo)}")"/>
+                                    <RadzenText TextStyle="TextStyle.Subtitle1">@notificacion.Tipo.ToUpper()</RadzenText>
+                                </div>
+                                <div>
+                                    <RadzenBadge BadgeStyle="@(notificacion.EstadoAtencion == "pendiente" ? BadgeStyle.Warning : BadgeStyle.Success)" 
+                                                Text="@(notificacion.EstadoAtencion == "pendiente" ? "PENDIENTE" : "ATENDIDA")" />
+                                    
+                                    <RadzenBadge BadgeStyle="@(notificacion.Leida == 1 ? BadgeStyle.Light : BadgeStyle.Info)" 
+                                                Text="@(notificacion.Leida == 1 ? "LEÍDA" : "NUEVA")" 
+                                                Class="ms-1" />
+                                </div>
+                            </div>
+                            
+                            <RadzenText TextStyle="TextStyle.Body1" class="my-2">@notificacion.Contenido</RadzenText>
+                            
+                            <div class="d-flex justify-content-between">
+                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted">
+                                    @if (!string.IsNullOrEmpty(notificacion.NombreOrigen))
+                                    {
+                                        <span>De: @notificacion.NombreOrigen</span>
+                                    }
+                                </RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted">
+                                    @notificacion.FechaCreacion.ToString("dd/MM/yyyy HH:mm")
+                                </RadzenText>
+                            </div>
+                        </RadzenCol>
+                    </RadzenRow>
+                </RadzenCard>
+            </Template>
+            <EmptyTemplate>
+                <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" Icon="notifications_off">
+                    Este usuario no tiene notificaciones.
+                </RadzenAlert>
+            </EmptyTemplate>
+        </RadzenDataList>
+    }
+    else if (Usuario.NotificacionesRecientes != null && Usuario.NotificacionesRecientes.Any())
+    {
+        <!-- Lista de notificaciones básicas -->
+        <RadzenDataList Data="@Usuario.NotificacionesRecientes" 
+                      TItem="NotificacionUsuario" 
+                      AllowPaging="true" 
+                      PageSize="5"
+                      WrapItems="true">
+            <Template Context="notificacion">
+                <RadzenCard class="mb-3">
+                    <RadzenRow>
+                        <RadzenCol Size="12">
+                            <div class="d-flex align-items-center">
+                                <RadzenIcon Icon="@ObtenerIconoNotificacion(notificacion.Tipo)" 
+                                          Style="@($"color: {ObtenerColorNotificacion(notificacion.Tipo)}")" 
+                                          class="me-2" />
+                                <div class="w-100">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <RadzenText TextStyle="TextStyle.Subtitle1">@notificacion.Tipo</RadzenText>
+                                        <RadzenBadge BadgeStyle="@(notificacion.Leida == 1 ? BadgeStyle.Light : BadgeStyle.Info)" 
+                                                    Text="@(notificacion.Leida == 1 ? "LEÍDA" : "NUEVA")" />
+                                    </div>
+                                    <RadzenText TextStyle="TextStyle.Body1" class="mb-1">@notificacion.Contenido</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted">
+                                        @notificacion.FechaCreacion.ToString("dd/MM/yyyy HH:mm")
+                                        @if (!string.IsNullOrEmpty(notificacion.NombreOrigen))
+                                        {
+                                            <span> - De: @notificacion.NombreOrigen</span>
+                                        }
+                                    </RadzenText>
+                                </div>
+                            </div>
+                        </RadzenCol>
+                    </RadzenRow>
+                </RadzenCard>
+            </Template>
+            <EmptyTemplate>
+                <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" Icon="notifications_off">
+                    Este usuario no tiene notificaciones recientes.
+                </RadzenAlert>
+            </EmptyTemplate>
+        </RadzenDataList>
+    }
+    else
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" Icon="notifications_off">
+            Este usuario no tiene notificaciones recientes.
+        </RadzenAlert>
+    }
+</RadzenCard>
+
+@code {
+    [Parameter] public bool CargandoNotificaciones { get; set; }
+    [Parameter] public DatosNotificacionesEstado NotificacionesEstado { get; set; }
+    [Parameter] public UsuarioDetalle Usuario { get; set; }
+    [Parameter] public Func<string, string> ObtenerIconoNotificacion { get; set; }
+    [Parameter] public Func<string, string> ObtenerColorNotificacion { get; set; }
+}

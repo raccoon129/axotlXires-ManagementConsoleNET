@@ -1,0 +1,149 @@
+﻿@using DAL.Modelos
+@using DAL.Consumo
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject AuthService AuthService
+@inject IJSRuntime JSRuntime
+
+<RadzenCard class="mt-4">
+    <h4 class="mb-4">Comentarios del usuario</h4>
+
+    @if (CargandoComentarios)
+    {
+        <div class="d-flex justify-content-center my-4">
+            <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Info" Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+    else if (ComentariosDetallados != null && ComentariosDetallados.Comentarios != null && ComentariosDetallados.Comentarios.Any())
+    {
+        <RadzenRow class="mb-3">
+            <RadzenCol Size="12">
+                <div class="d-flex justify-content-end">
+                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"Total: {ComentariosDetallados.TotalComentarios} comentarios")" />
+                </div>
+            </RadzenCol>
+        </RadzenRow>
+
+        <RadzenDataList Data="@ComentariosDetallados.Comentarios" TItem="ComentarioDetallado" AllowPaging="true" PageSize="5" WrapItems="true">
+            <Template Context="comentario">
+                <RadzenCard class="mb-3">
+                    <RadzenRow>
+                        <RadzenCol Size="12">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <RadzenText TextStyle="TextStyle.Subtitle1">En: @comentario.TituloPublicacion</RadzenText>
+                                <div class="d-flex align-items-center">
+                                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted me-3">
+                                        @comentario.FechaCreacion.ToString("dd/MM/yyyy HH:mm")
+                                    </RadzenText>
+                                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small"
+                                                Click="@(() => ConfirmarEliminarComentario(comentario))"
+                                                Variant="Variant.Flat" Title="Eliminar comentario" />
+                                </div>
+                            </div>
+                            <RadzenText TextStyle="TextStyle.Body1" class="mb-3">@comentario.Contenido</RadzenText>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted">ID Publicación: @comentario.IdPublicacion</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted">ID Comentario: @comentario.IdComentario</RadzenText>
+                            </div>
+                        </RadzenCol>
+                    </RadzenRow>
+                </RadzenCard>
+            </Template>
+            <EmptyTemplate>
+                <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" Icon="comment">
+                    Este usuario no tiene comentarios.
+                </RadzenAlert>
+            </EmptyTemplate>
+        </RadzenDataList>
+    }
+    else
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" Icon="comment">
+            Este usuario no tiene comentarios.
+        </RadzenAlert>
+    }
+</RadzenCard>
+
+@code {
+    [Parameter] public bool CargandoComentarios { get; set; }
+    [Parameter] public DatosComentariosUsuario ComentariosDetallados { get; set; }
+    [Parameter] public EventCallback<int> OnComentarioEliminado { get; set; }
+
+    /// <summary>
+    /// Muestra el diálogo de confirmación para eliminar un comentario
+    /// </summary>
+    private async Task ConfirmarEliminarComentario(ComentarioDetallado comentario)
+    {
+        var result = await DialogService.OpenAsync<ConfirmacionDialog>("Confirmar eliminación",
+            new Dictionary<string, object>
+            {
+                { "Mensaje", "¿Está seguro que desea eliminar este comentario? Esta acción no se puede deshacer." },
+                { "TituloBotonConfirmar", "Eliminar" },
+                { "EstiloBotonConfirmar", ButtonStyle.Danger }
+            },
+            new DialogOptions
+            {
+                Width = "450px",
+                CloseDialogOnOverlayClick = true,
+                CloseDialogOnEsc = true,
+                ShowClose = true
+            });
+
+        if (result == true)
+        {
+            await EliminarComentario(comentario.IdComentario);
+        }
+    }
+
+    /// <summary>
+    /// Elimina un comentario del usuario
+    /// </summary>
+    private async Task EliminarComentario(int idComentario)
+    {
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+            if (string.IsNullOrEmpty(token))
+            {
+                return;
+            }
+
+            // Llamar al servicio para eliminar el comentario
+            var respuesta = await gestionUsuarios.EliminarComentarioAsync(token, idComentario);
+
+            if (respuesta != null && respuesta.Status == "success")
+            {
+                // Eliminar el comentario de la lista local
+                if (ComentariosDetallados != null && ComentariosDetallados.Comentarios != null)
+                {
+                    var comentarioAEliminar = ComentariosDetallados.Comentarios.FirstOrDefault(c => c.IdComentario == idComentario);
+                    if (comentarioAEliminar != null)
+                    {
+                        ComentariosDetallados.Comentarios.Remove(comentarioAEliminar);
+                        ComentariosDetallados.TotalComentarios--;
+                        
+                        // Notificar al componente padre que se eliminó un comentario
+                        await OnComentarioEliminado.InvokeAsync(idComentario);
+                    }
+                }
+
+                NotificationService.Notify(NotificationSeverity.Success, "Éxito", 
+                    "Comentario eliminado correctamente");
+
+                StateHasChanged();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error",
+                    respuesta?.Mensaje ?? "No se pudo eliminar el comentario");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error",
+                $"Error al eliminar comentario: {ex.Message}");
+        }
+    }
+}

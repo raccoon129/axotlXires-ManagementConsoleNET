@@ -1,0 +1,249 @@
+﻿@using DAL.Modelos
+
+<div class="row mt-4">
+    <!-- Panel izquierdo - Información personal -->
+    <div class="col-md-4 mb-4">
+        <RadzenCard class="h-100">
+            <div class="text-center mb-3">
+                @if (!string.IsNullOrEmpty(ImagenPerfilBase64))
+                {
+                    <div class="position-relative d-inline-block">
+                        <img src="@($"data:image/jpeg;base64,{ImagenPerfilBase64}")"
+                             style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover;"
+                             alt="Foto de perfil" />
+                        @if (EsUsuarioEditable)
+                        {
+                            <button class="btn btn-sm btn-light position-absolute bottom-0 end-0"
+                                    @onclick="OnMostrarDialogoRestablecerFoto"
+                                    title="Restablecer foto de perfil">
+                                <i class="fa fa-undo"></i>
+                            </button>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div style="width: 150px; height: 150px; border-radius: 50%; background-color: #612c7d; margin: 0 auto; display: flex; align-items: center; justify-content: center;">
+                        <RadzenIcon Icon="person" style="font-size: 80px; color: white;" />
+                    </div>
+                }
+
+                <h4 class="mt-3 mb-1">@Usuario.Nombre</h4>
+                <div class="mb-2">
+                    <RadzenBadge BadgeStyle="@ObtenerEstiloPorRol(Usuario.Rol)" Text="@Usuario.Rol.ToUpper()" />
+                    @if (Usuario.Activo == 1)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="ACTIVO" Class="ms-2" />
+                    }
+                    else
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="INACTIVO" Class="ms-2" />
+                    }
+                </div>
+                <p class="text-muted">@Usuario.Nombramiento</p>
+            </div>
+
+            <hr />
+
+            <h6 class="mb-3">Información de contacto</h6>
+            <div class="mb-3">
+                <div class="d-flex align-items-center mb-2">
+                    <RadzenIcon Icon="email" class="me-2" />
+                    <span>@Usuario.Correo</span>
+                </div>
+                <div class="d-flex align-items-center mb-2">
+                    <RadzenIcon Icon="event" class="me-2" />
+                    <span>Registrado el @Usuario.FechaCreacion.ToString("dd/MM/yyyy")</span>
+                </div>
+                <div class="d-flex align-items-center">
+                    <RadzenIcon Icon="access_time" class="me-2" />
+                    <span>Último acceso: @Usuario.UltimoAcceso.ToString("dd/MM/yyyy HH:mm")</span>
+                </div>
+            </div>
+
+            <hr />
+
+            <!-- Acciones de usuario -->
+            <div class="d-grid gap-2">
+                @if (EsUsuarioEditable)
+                {
+                    <RadzenButton Text="Restablecer foto de perfil" Icon="restore"
+                                  ButtonStyle="ButtonStyle.Primary"
+                                  Click="@OnMostrarDialogoRestablecerFoto" />
+
+                    <RadzenButton Text="Resetear contraseña" Icon="key"
+                                  ButtonStyle="ButtonStyle.Light"
+                                  Click="@OnResetearContrasena" />
+
+                    @if (Usuario.Activo == 1)
+                    {
+                        <RadzenButton Text="Desactivar usuario" Icon="block"
+                                      ButtonStyle="ButtonStyle.Danger"
+                                      Click="@(() => CambiarActivacionHandler(0))" />
+                    }
+                    else
+                    {
+                        <RadzenButton Text="Activar usuario" Icon="check_circle"
+                                      ButtonStyle="ButtonStyle.Success"
+                                      Click="@(() => CambiarActivacionHandler(1))" />
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-warning" role="alert">
+                        <div class="d-flex align-items-center">
+                            <RadzenIcon Icon="warning" class="me-2" />
+                            <span>No se puede modificar a un usuario administrador</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </RadzenCard>
+    </div>
+
+    <!-- Panel derecho - Estadísticas -->
+    <div class="col-md-8">
+        <!-- Estadísticas de publicaciones -->
+        <RadzenCard class="mb-4">
+            <h5>Estadísticas de publicaciones</h5>
+            <div class="row row-cols-2 row-cols-md-5 g-3 mt-2">
+                <div class="col">
+                    <RadzenCard class="h-100 text-center">
+                        <h3 class="card-title mb-0">@Usuario.Estadisticas.Publicaciones.TotalPublicaciones</h3>
+                        <RadzenText TextStyle="TextStyle.Caption" class="text-muted">Total</RadzenText>
+                    </RadzenCard>
+                </div>
+                <div class="col">
+                    <RadzenCard Class="h-100 text-center border-success">
+                        <h3 class="card-title mb-0 text-success">@Usuario.Estadisticas.Publicaciones.Publicadas</h3>
+                        <RadzenText TextStyle="TextStyle.Caption" class="text-muted">Publicadas</RadzenText>
+                    </RadzenCard>
+                </div>
+                <div class="col">
+                    <RadzenCard Class="h-100 text-center border-warning">
+                        <h3 class="card-title mb-0 text-warning">@Usuario.Estadisticas.Publicaciones.PendientesRevision</h3>
+                        <RadzenText TextStyle="TextStyle.Caption" class="text-muted">En revisión</RadzenText>
+                    </RadzenCard>
+                </div>
+                <div class="col">
+                    <RadzenCard Class="h-100 text-center border-danger">
+                        <h3 class="card-title mb-0 text-danger">@Usuario.Estadisticas.Publicaciones.Rechazadas</h3>
+                        <RadzenText TextStyle="TextStyle.Caption" class="text-muted">Rechazadas</RadzenText>
+                    </RadzenCard>
+                </div>
+                <div class="col">
+                    <RadzenCard Class="h-100 text-center border-secondary">
+                        <h3 class="card-title mb-0 text-secondary">@Usuario.Estadisticas.Publicaciones.Borradores</h3>
+                        <RadzenText TextStyle="TextStyle.Caption" class="text-muted">Borradores</RadzenText>
+                    </RadzenCard>
+                </div>
+            </div>
+        </RadzenCard>
+
+        <!-- Otras estadísticas y actividad -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <RadzenCard class="h-100">
+                    <h5>Comentarios y notificaciones</h5>
+                    <RadzenRow class="mt-3">
+                        <RadzenCol Size="6">
+                            <div class="d-flex flex-column align-items-center py-3">
+                                <div class="rounded-circle bg-primary bg-opacity-25 p-3 mb-2">
+                                    <RadzenIcon Icon="comment" Style="color: var(--rz-primary); font-size: 1.5rem;" />
+                                </div>
+                                <div class="text-center">
+                                    <h4 class="mb-0">@Usuario.Estadisticas.TotalComentarios</h4>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted">Comentarios</RadzenText>
+                                </div>
+                            </div>
+                        </RadzenCol>
+                        <RadzenCol Size="6">
+                            <div class="d-flex flex-column align-items-center py-3">
+                                <div class="rounded-circle bg-warning bg-opacity-25 p-3 mb-2">
+                                    <RadzenIcon Icon="notifications" Style="color: var(--rz-warning); font-size: 1.5rem;" />
+                                </div>
+                                <div class="text-center">
+                                    <h4 class="mb-0">@Usuario.Estadisticas.TotalNotificaciones</h4>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted">Notificaciones</RadzenText>
+                                </div>
+                            </div>
+                        </RadzenCol>
+                    </RadzenRow>
+                </RadzenCard>
+            </div>
+            <div class="col-md-6">
+                <RadzenCard class="h-100">
+                    <h5>Actividad reciente</h5>
+                    <div class="d-flex align-items-center mt-3 mb-2">
+                        <RadzenIcon Icon="access_time" class="me-2" Style="color: var(--rz-primary);" />
+                        <span>Último acceso: <strong>@Usuario.Estadisticas.UltimoAcceso.ToString("dd/MM/yyyy HH:mm")</strong></span>
+                    </div>
+                    @if (Usuario.ComentariosRecientes != null && Usuario.ComentariosRecientes.Any())
+                    {
+                        <div class="d-flex align-items-center mt-2">
+                            <RadzenIcon Icon="comment" class="me-2" Style="color: var(--rz-info);" />
+                            <span>Último comentario: <strong>@Usuario.ComentariosRecientes.First().FechaCreacion.ToString("dd/MM/yyyy HH:mm")</strong></span>
+                        </div>
+                    }
+                </RadzenCard>
+            </div>
+        </div>
+
+        <!-- Publicaciones recientes -->
+        @if (Usuario.Publicaciones != null && Usuario.Publicaciones.Any())
+        {
+            <RadzenCard>
+                <h5>Publicaciones recientes</h5>
+                <RadzenDataList Data="@Usuario.Publicaciones.Take(5)" TItem="PublicacionUsuario" AllowPaging="false" PageSize="5" WrapItems="true">
+                    <Template Context="publicacion">
+                        <div class="d-flex align-items-start border-bottom pb-3 mb-3">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">@publicacion.Titulo</h6>
+                                <p class="mb-1 small text-muted">@(publicacion.Resumen?.Length > 100 ? $"{publicacion.Resumen.Substring(0, 100)}..." : publicacion.Resumen)</p>
+                                <div>
+                                    <RadzenBadge BadgeStyle="@ObtenerEstiloPorEstadoPublicacion(publicacion.Estado)" Text="@publicacion.Estado.ToUpper()" />
+                                    <small class="ms-2">@publicacion.FechaCreacion.ToString("dd/MM/yyyy")</small>
+                                </div>
+                            </div>
+                        </div>
+                    </Template>
+                </RadzenDataList>
+            </RadzenCard>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public UsuarioDetalle Usuario { get; set; }
+    [Parameter] public string ImagenPerfilBase64 { get; set; }
+    [Parameter] public bool EsUsuarioEditable { get; set; }
+    [Parameter] public EventCallback OnModoEdicionCambio { get; set; }
+    [Parameter] public EventCallback OnResetearContrasena { get; set; }
+    [Parameter] public EventCallback<int> OnCambiarActivacion { get; set; }
+    [Parameter] public EventCallback OnMostrarDialogoRestablecerFoto { get; set; }
+    [Parameter] public Func<string, BadgeStyle> ObtenerEstiloPorRol { get; set; }
+    [Parameter] public Func<string, BadgeStyle> ObtenerEstiloPorEstadoPublicacion { get; set; }
+
+
+    // Inyección de servicios necesarios
+    [Inject] private IJSRuntime JSRuntime { get; set; }
+
+    // Método auxiliar para enviar el valor al evento OnCambiarActivacion
+    private async Task CambiarActivacionHandler(int nuevoEstado)
+    {
+        await OnCambiarActivacion.InvokeAsync(nuevoEstado);
+    }
+
+    // Método para mostrar un alert de confirmación para restablecer foto de perfil
+    private async Task MostrarConfirmacionRestablecerFoto()
+    {
+        bool confirmado = await JSRuntime.InvokeAsync<bool>("confirm",
+            "¿Está seguro que desea restablecer la foto de perfil a la imagen predeterminada?");
+
+        if (confirmado)
+        {
+            await OnMostrarDialogoRestablecerFoto.InvokeAsync();
+        }
+    }
+
+}
