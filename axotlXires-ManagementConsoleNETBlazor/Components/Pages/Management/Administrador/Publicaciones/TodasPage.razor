@@ -87,21 +87,7 @@
                     <!-- Fecha de publicación -->
                     <RadzenDataGridColumn TItem="PublicacionConsulta" Property="FechaPublicacion" Title="Fecha publicación" Width="120px">
                         <Template Context="publicacion">
-                            @(publicacion.FechaPublicacion.HasValue ? publicacion.FechaPublicacion.Value.ToString("dd/MM/yyyy") : "-")
-                        </Template>
-                    </RadzenDataGridColumn>
-
-                    <!-- Estadísticas -->
-                    <RadzenDataGridColumn TItem="PublicacionConsulta" Title="Estadísticas" Width="100px" TextAlign="TextAlign.Center">
-                        <Template Context="publicacion">
-                            <div class="d-flex gap-2 justify-content-center">
-                                <span title="Comentarios">
-                                    <i class="bi bi-chat-text text-primary"></i> @publicacion.TotalComentarios
-                                </span>
-                                <span title="Favoritos">
-                                    <i class="bi bi-star-fill text-warning"></i> @publicacion.TotalFavoritos
-                                </span>
-                            </div>
+                            @(publicacion.FechaPublicacion.HasValue ? publicacion.FechaPublicacion.Value.ToString("dd/MM/yyyy") : "No publicado")
                         </Template>
                     </RadzenDataGridColumn>
 
@@ -137,13 +123,13 @@
                         <Template Context="publicacion">
                             <RadzenButton Icon="visibility" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
                                           Click="@(() => VerDetallesPublicacion(publicacion.IdPublicacion))"
-                                          Variant="Variant.Flat" Tooltip="Ver detalles" />
+                                          Tooltip="Ver detalles" />
 
                             @if (publicacion.Estado.ToLower() == "solicita_cambios" || publicacion.Estado.ToLower() == "en_revision")
                             {
                                 <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Small"
                                               Click="@(() => VerRevisionPublicacion(publicacion.IdPublicacion))"
-                                              Variant="Variant.Flat" Tooltip="Revisar" />
+                                              Tooltip="Revisar" />
                             }
                         </Template>
                     </RadzenDataGridColumn>

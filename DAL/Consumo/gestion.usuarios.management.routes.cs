@@ -885,5 +885,91 @@ namespace DAL.Consumo
                 };
             }
         }
+
+        /// <summary>
+        /// Verifica el estado de activación de un usuario específico
+        /// </summary>
+        /// <param name="token">Token JWT de autenticación</param>
+        /// <param name="idUsuario">ID del usuario a consultar</param>
+        /// <returns>Respuesta con el estado de activación del usuario o false si ocurre un error</returns>
+        public static async Task<RespuestaVerificacionActivacion> VerificarActivacionUsuarioAsync(string token, int idUsuario)
+        {
+            // Validaciones básicas
+            if (string.IsNullOrEmpty(token))
+            {
+                return new RespuestaVerificacionActivacion
+                {
+                    Status = "error",
+                    Mensaje = "Token no proporcionado",
+                    Activo = false
+                };
+            }
+
+            if (idUsuario <= 0)
+            {
+                return new RespuestaVerificacionActivacion
+                {
+                    Status = "error",
+                    Mensaje = "ID de usuario no válido",
+                    Activo = false
+                };
+            }
+
+            try
+            {
+                // Crear cliente HTTP
+                using var client = new HttpClient();
+                client.BaseAddress = new Uri(Parametros.UrlBaseApi);
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                // Realizar la petición GET
+                HttpResponseMessage respuesta = await client.GetAsync($"/api/management/gestion/usuarios/{idUsuario}/activacion");
+
+                // Verificar respuesta
+                if (respuesta.IsSuccessStatusCode)
+                {
+                    var contenido = await respuesta.Content.ReadFromJsonAsync<RespuestaVerificacionActivacion>();
+
+                    // Si solo regresa { "activo": true/false } sin status ni mensaje
+                    if (contenido.Status == null)
+                    {
+                        contenido.Status = "success";
+                    }
+
+                    return contenido;
+                }
+                else
+                {
+                    // Intentar leer el mensaje de error
+                    try
+                    {
+                        var error = await respuesta.Content.ReadFromJsonAsync<RespuestaVerificacionActivacion>();
+                        if (error != null)
+                        {
+                            return error;
+                        }
+                    }
+                    catch { /* Ignorar errores al leer respuesta de error */ }
+
+                    // Crear una respuesta de error por defecto
+                    return new RespuestaVerificacionActivacion
+                    {
+                        Status = "error",
+                        Mensaje = $"Error al verificar estado: {respuesta.StatusCode}",
+                        Activo = false
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new RespuestaVerificacionActivacion
+                {
+                    Status = "error",
+                    Mensaje = $"Excepción al verificar estado: {ex.Message}",
+                    Activo = false
+                };
+            }
+        }
+
     }
 }

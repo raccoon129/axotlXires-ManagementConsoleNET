@@ -27,7 +27,7 @@
                             Placeholder="Filtrar por rol" />
         </div>
         <div class="col-md-2">
-            <RadzenButton Icon="add" Text="Nuevo Usuario"
+            <RadzenButton Icon="add" Text="Nuevo"
                           ButtonStyle="ButtonStyle.Success"
                           Click="@AbrirModalNuevoUsuario"
                           Style="width: 100%;" />
@@ -98,13 +98,22 @@
 
                     <RadzenDataGridColumn TItem="UsuarioListado" Property="Activo" Title="Estado" Width="100px" TextAlign="TextAlign.Center">
                         <Template Context="usuario">
-                            @if (usuario.Activo == 1)
+                            @if (estadosActivacion.TryGetValue(usuario.IdUsuario, out bool estaActivo))
                             {
-                                <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="ACTIVO" />
+                                if (estaActivo)
+                                {
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="ACTIVO" />
+                                }
+                                else
+                                {
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="INACTIVO" />
+                                }
                             }
                             else
                             {
-                                <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="INACTIVO" />
+                                <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                                    <span class="visually-hidden">Cargando...</span>
+                                </div>
                             }
                         </Template>
                     </RadzenDataGridColumn>
@@ -143,17 +152,16 @@
                             }
                         </Template>
                     </RadzenDataGridColumn>
-
-
-                    <RadzenDataGridColumn TItem="UsuarioListado" Title="Acciones" Width="220px" Sortable="false" Filterable="false">
+                    <!-- Columna de acciones -->
+                    <RadzenDataGridColumn TItem="UsuarioListado" Title="Acciones" Width="110px" Sortable="false" Filterable="false">
                         <Template Context="usuario">
                             <RadzenButton Icon="person" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
                                           Click="@(() => VerDetallesUsuario(usuario.IdUsuario))"
-                                          Variant="Variant.Flat" Title="Ver detalles" />
+                                          Title="Ver detalles" />
 
                             <RadzenButton Icon="key" ButtonStyle="ButtonStyle.Warning" Size="ButtonSize.Small"
                                           Click="@(() => AbrirModalResetearContrasena(usuario))"
-                                          Variant="Variant.Flat" Title="Resetear contraseña" />
+                                          Title="Resetear contraseña" />
                         </Template>
                     </RadzenDataGridColumn>
                 </Columns>
@@ -191,7 +199,6 @@
             await CargarUsuarios();
         }
     }
-
     /// <summary>
     /// Carga la lista de usuarios desde la API
     /// </summary>
@@ -218,12 +225,18 @@
 
             if (usuarios != null)
             {
+                // Limpiar el diccionario de estados de activación
+                estadosActivacion.Clear();
+
                 // Aplicar filtros iniciales
                 usuariosFiltrados = usuarios;
                 AplicarFiltros();
 
                 // Cargar las fotos de perfil
                 await CargarFotosPerfiles(token);
+
+                // Cargar los estados de activación reales
+                await CargarEstadosActivacion(token);
             }
             else
             {
@@ -356,10 +369,10 @@
     {
         var resultado = await DialogService.OpenAsync<ResetearContrasenaDialog>("Resetear Contraseña",
             new Dictionary<string, object>
-                            {
+                                {
                 { "IdUsuario", usuario.IdUsuario },
                 { "NombreUsuario", usuario.Nombre }
-                            },
+                                },
             new DialogOptions { Width = "700px", Height = "500px", CloseDialogOnOverlayClick = false });
 
         if (resultado != null && (bool)resultado == true)
@@ -382,6 +395,48 @@
             await CargarUsuarios();
             NotificationService.Notify(NotificationSeverity.Success, "Éxito", "Usuario creado correctamente");
         }
+    }
+
+    // Diccionario para almacenar los estados de activación de los usuarios
+    private Dictionary<int, bool> estadosActivacion = new Dictionary<int, bool>();
+
+    // Método para cargar los estados de activación
+    private async Task CargarEstadosActivacion(string token)
+    {
+        if (usuarios == null || !usuarios.Any()) return;
+
+        foreach (var usuario in usuarios)
+        {
+            try
+            {
+                var respuesta = await gestionUsuarios.VerificarActivacionUsuarioAsync(token, usuario.IdUsuario);
+
+                if (respuesta != null && respuesta.Status == "success")
+                {
+                    // Actualizar el estado de activación en el diccionario
+                    estadosActivacion[usuario.IdUsuario] = respuesta.Activo;
+
+                    // Convertir el estado booleano a 1/0 para el modelo UsuarioListado
+                    usuario.Activo = respuesta.Activo ? 1 : 0;
+                }
+                else
+                {
+                    // Por defecto, considerar desactivado si hay error
+                    estadosActivacion[usuario.IdUsuario] = false;
+                    usuario.Activo = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al obtener estado de activación del usuario {usuario.IdUsuario}: {ex.Message}");
+                // Por defecto en caso de error
+                estadosActivacion[usuario.IdUsuario] = false;
+                usuario.Activo = 0;
+            }
+        }
+
+        // Actualizamos la UI
+        StateHasChanged();
     }
 
 }

@@ -48,7 +48,7 @@ namespace DAL.Modelos
         /// <summary>
         /// Estado de activación del usuario (1: activo, 0: inactivo)
         /// </summary>
-        public int Activo { get; set; } = 1;
+        public int Activo { get; set; }
     }
 
     /// <summary>
@@ -546,5 +546,21 @@ namespace DAL.Modelos
     }
     #endregion
 
+    #region Modelos para verificación de estado de activación
+
+    /// <summary>
+    /// Respuesta a la verificación de estado de activación de un usuario
+    /// </summary>
+    public class RespuestaVerificacionActivacion
+    {
+        public string Status { get; set; }
+        public string Mensaje { get; set; }
+
+        /// <summary>
+        /// Estado de activación: true para activo, false para inactivo
+        /// </summary>
+        public bool Activo { get; set; }
+    }
+    #endregion
 
 }
