@@ -65,8 +65,17 @@
                 <Columns>
                     <RadzenDataGridColumn TItem="UsuarioListado" Property="FotoPerfil" Title="Foto" Width="80px" Sortable="false" Filterable="false">
                         <Template Context="usuario">
-                            <RadzenImage Path="@(string.IsNullOrEmpty(usuario.FotoPerfil) ? "/img/default-avatar.png" : usuario.FotoPerfil)"
-                                         Style="width: 40px; height: 40px; border-radius: 50%;" />
+                            @if (imagenesCargadas.ContainsKey(usuario.IdUsuario))
+                            {
+                                <img src="@($"data:image/jpeg;base64,{imagenesCargadas[usuario.IdUsuario]}")"
+                                     style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;"
+                                     alt="Foto de perfil" />
+                            }
+                            else
+                            {
+                                <RadzenImage Path="/img/default-avatar.png"
+                                             Style="width: 40px; height: 40px; border-radius: 50%;" />
+                            }
                         </Template>
                     </RadzenDataGridColumn>
 
@@ -112,7 +121,8 @@
 
                             @if (tieneUltimoAcceso)
                             {
-                                @usuario.UltimoAcceso;
+                                @usuario.UltimoAcceso
+                                ;
                             }
                             else
                             {
@@ -152,6 +162,12 @@
     private string terminoBusqueda = string.Empty;
     private string filtroRol = string.Empty;
     private List<string> roles = new List<string> { "todos", "administrador", "moderador", "revisor", "usuario" };
+
+    // Instancia del servicio para consultar imágenes
+    private readonly consultarImagenes _servicioImagenes = new consultarImagenes();
+
+    // Diccionario para almacenar las imágenes cargadas (ID usuario -> imagen en base64)
+    private Dictionary<int, string> imagenesCargadas = new Dictionary<int, string>();
 
     // Método que se ejecuta al cargar el componente
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -193,6 +209,9 @@
                 // Aplicar filtros iniciales
                 usuariosFiltrados = usuarios;
                 AplicarFiltros();
+
+                // Cargar las fotos de perfil
+                await CargarFotosPerfiles(token);
             }
             else
             {
@@ -211,6 +230,42 @@
             cargando = false;
             StateHasChanged();
         }
+    }
+
+    /// <summary>
+    /// Carga las fotos de perfil de los usuarios
+    /// </summary>
+    private async Task CargarFotosPerfiles(string token)
+    {
+        if (usuarios == null || !usuarios.Any()) return;
+
+        // Limpiamos el diccionario de imágenes
+        imagenesCargadas.Clear();
+
+        // Para cada usuario, intentamos cargar su imagen de perfil
+        foreach (var usuario in usuarios)
+        {
+            try
+            {
+                // Obtener la imagen como array de bytes
+                var imagenBytes = await _servicioImagenes.ObtenerImagenPerfilBytesAsync(token, usuario.IdUsuario);
+
+                if (imagenBytes != null && imagenBytes.Length > 0)
+                {
+                    // Convertir a Base64 para mostrar en la imagen
+                    string base64 = Convert.ToBase64String(imagenBytes);
+                    imagenesCargadas[usuario.IdUsuario] = base64;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Si falla la carga de una imagen, solo lo registramos pero no interrumpimos el proceso
+                Console.WriteLine($"Error al cargar la imagen del usuario {usuario.IdUsuario}: {ex.Message}");
+            }
+        }
+
+        // Actualizamos la UI después de cargar todas las imágenes
+        StateHasChanged();
     }
 
     /// <summary>
@@ -282,8 +337,6 @@
         NavigationManager.NavigateTo($"/administrador/usuarios/{idUsuario}");
     }
 
-
-
     /// <summary>
     /// Abre modal para resetear la contraseña de un usuario
     /// </summary>
@@ -291,10 +344,10 @@
     {
         var resultado = await DialogService.OpenAsync<ResetearContrasenaDialog>("Resetear Contraseña",
             new Dictionary<string, object>
-                    {
+                        {
                 { "IdUsuario", usuario.IdUsuario },
                 { "NombreUsuario", usuario.Nombre }
-                    },
+                        },
             new DialogOptions { Width = "700px", Height = "500px", CloseDialogOnOverlayClick = false });
 
         if (resultado != null && (bool)resultado == true)

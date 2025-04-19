@@ -45,6 +45,29 @@
                     @(RevisionActiva != null ? "Revisión en curso" : "Realizar revisión")
                 </h5>
 
+                <!-- Mostrar información de revisión anterior si existe -->
+                @if (UltimaRevisionFinalizada != null)
+                {
+                    <div class="alert alert-secondary mb-3">
+                        <div class="d-flex">
+                            <div class="me-2"><i class="bi bi-info-circle-fill"></i></div>
+                            <div>
+                                <p class="mb-1"><strong>Revisión anterior:</strong></p>
+                                <p class="mb-0">
+                                    <strong>Tipo:</strong> @UltimaRevisionFinalizada.TipoRevision
+                                </p>
+                                <p class="mb-0">
+                                    <strong>Descripción:</strong> @UltimaRevisionFinalizada.DescripcionRevision
+                                </p>
+                                <p class="mb-0 text-muted">
+                                    Realizada el @UltimaRevisionFinalizada.FechaCreacion.ToString("dd/MM/yyyy HH:mm")
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <!-- Mostrar información de revisión activa si existe -->
                 @if (RevisionActiva != null)
                 {
                     <div class="alert alert-info mb-4">
@@ -64,34 +87,34 @@
                         </div>
                     </div>
                 }
-                else
-                {
-                    <div class="mt-4">
-                        <RadzenText TextStyle="TextStyle.Subtitle2">Tipo de revisión</RadzenText>
-                        <RadzenTextBox @bind-Value="TipoRevisionTexto"
-                                       Placeholder="Ejemplo: Ortografía, Contenido, Referencias, etc."
-                                       Style="width: 100%;" />
-                        @if (string.IsNullOrEmpty(TipoRevisionTexto))
-                        {
-                            <div class="text-danger small mt-1">
-                                El tipo de revisión es obligatorio
-                            </div>
-                        }
-                    </div>
 
-                    <div class="mt-4">
-                        <RadzenText TextStyle="TextStyle.Subtitle2">Descripción de la revisión</RadzenText>
-                        <RadzenTextArea @bind-Value="DescripcionRevision"
-                                        Placeholder="Describa brevemente el propósito y enfoque de esta revisión..."
-                                        Style="width: 100%; min-height: 80px;" />
-                        @if (string.IsNullOrEmpty(DescripcionRevision))
-                        {
-                            <div class="text-danger small mt-1">
-                                La descripción de la revisión es obligatoria
-                            </div>
-                        }
-                    </div>
-                }
+                <!-- Siempre mostrar los campos de tipo de revisión y descripción, independientemente
+                     de si hay una revisión activa o no -->
+                <div class="mt-4">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Tipo de revisión</RadzenText>
+                    <RadzenTextBox @bind-Value="TipoRevisionTexto"
+                                   Placeholder="Ejemplo: Ortografía, Contenido, Referencias, etc."
+                                   Style="width: 100%;" />
+                    @if (string.IsNullOrEmpty(TipoRevisionTexto))
+                    {
+                        <div class="text-danger small mt-1">
+                            El tipo de revisión es obligatorio
+                        </div>
+                    }
+                </div>
+
+                <div class="mt-4">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Descripción de la revisión</RadzenText>
+                    <RadzenTextArea @bind-Value="DescripcionRevision"
+                                    Placeholder="Describa brevemente el propósito y enfoque de esta revisión..."
+                                    Style="width: 100%; min-height: 80px;" />
+                    @if (string.IsNullOrEmpty(DescripcionRevision))
+                    {
+                        <div class="text-danger small mt-1">
+                            La descripción de la revisión es obligatoria
+                        </div>
+                    }
+                </div>
 
                 <div class="mt-4">
                     <RadzenText TextStyle="TextStyle.Subtitle2">Comentario de retroalimentación</RadzenText>
@@ -334,25 +357,47 @@
     private string ComentarioRevision { get; set; } = string.Empty;
     private string DecisionRevision { get; set; } = string.Empty;
 
+    // Obtener la última revisión finalizada (si existe)
+    private RevisionCompleta UltimaRevisionFinalizada
+    {
+        get
+        {
+            if (TiposRevision == null || !TiposRevision.Any()) return null;
+
+            // Obtener la revisión anterior finalizada del listado de revisiones previas
+            var revisiones = DetallePublicacion?.Revisiones;
+            if (revisiones == null || !revisiones.Any()) return null;
+
+            // Excluir la revisión activa y obtener la más reciente que esté finalizada
+            return revisiones.Where(r => r.Aprobado != null && r.IdRevision != RevisionActiva?.IdRevision)
+                            .OrderByDescending(r => r.FechaCreacion)
+                            .FirstOrDefault();
+        }
+    }
+
+    [CascadingParameter]
+    public DetallePublicacion DetallePublicacion { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // Inicializar con datos de la revisión anterior si existe
+        if (UltimaRevisionFinalizada != null && string.IsNullOrEmpty(TipoRevisionTexto))
+        {
+            TipoRevisionTexto = UltimaRevisionFinalizada.TipoRevision;
+            DescripcionRevision = UltimaRevisionFinalizada.DescripcionRevision;
+        }
+    }
+
     /// <summary>
     /// Verifica si se cumplen las condiciones para poder finalizar la revisión
     /// </summary>
     private bool PuedeFinalizarRevision()
     {
-        // Verificar datos básicos necesarios
-        var datosBasicosCompletos = !string.IsNullOrWhiteSpace(ComentarioRevision) &&
-                                   !string.IsNullOrEmpty(DecisionRevision);
-
-        // Si ya hay una revisión activa, solo necesitamos los datos básicos
-        if (RevisionActiva != null)
-        {
-            return datosBasicosCompletos;
-        }
-
-        // Si es una nueva revisión, necesitamos también el tipo y descripción
-        return datosBasicosCompletos &&
-               !string.IsNullOrWhiteSpace(TipoRevisionTexto) &&
-               !string.IsNullOrWhiteSpace(DescripcionRevision);
+        // Siempre verificar que todos los campos estén completos
+        return !string.IsNullOrWhiteSpace(TipoRevisionTexto) &&
+               !string.IsNullOrWhiteSpace(DescripcionRevision) &&
+               !string.IsNullOrWhiteSpace(ComentarioRevision) &&
+               !string.IsNullOrEmpty(DecisionRevision);
     }
 
     /// <summary>
@@ -382,16 +427,18 @@
             // Invocar el evento para iniciar la revisión
             await OnIniciarNuevaRevision.InvokeAsync(datosInicio);
         }
+        else
+        {
+            // Crear el objeto resultado con la decisión y el comentario
+            var resultado = new RevisionResultado
+                {
+                    Decision = DecisionRevision,
+                    Comentario = ComentarioRevision
+                };
 
-        // Crear el objeto resultado con la decisión y el comentario
-        var resultado = new RevisionResultado
-            {
-                Decision = DecisionRevision,
-                Comentario = ComentarioRevision
-            };
-
-        // Invocar el evento del componente padre pasando el resultado
-        await OnFinalizarRevision.InvokeAsync(resultado);
+            // Invocar el evento del componente padre pasando el resultado
+            await OnFinalizarRevision.InvokeAsync(resultado);
+        }
 
         // Limpiar el formulario
         LimpiarFormulario();

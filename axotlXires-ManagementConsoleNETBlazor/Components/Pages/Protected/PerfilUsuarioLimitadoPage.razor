@@ -1,0 +1,692 @@
+﻿@page "/protected/usuarios/{IdUsuarioRuta:int}"
+@using DAL.Modelos
+@using DAL.Consumo
+@using System.IO
+@using System.Text.Json
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@using static DAL.Modelos.ModeloAdministradoresUsuarios
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<div class="container-fluid">
+    <h3 class="mb-4">Perfil de Usuario en Management Console</h3>
+
+    @if (cargando)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Primary" Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+    else if (error)
+    {
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">Error al cargar perfil</h4>
+            <p>@mensajeError</p>
+            <hr>
+            <div class="d-flex">
+                <RadzenButton Text="Volver" Icon="arrow_back" Click="@Volver" ButtonStyle="ButtonStyle.Secondary" />
+                @if (accesoDenegado)
+                {
+                    <RadzenButton Text="Ir a Mi Perfil" Icon="person" Click="@IrAMiPerfil" ButtonStyle="ButtonStyle.Primary" Class="ms-2" />
+                }
+                else
+                {
+                    <RadzenButton Text="Reintentar" Icon="refresh" Click="@CargarPerfilUsuario" ButtonStyle="ButtonStyle.Primary" Class="ms-2" />
+                }
+            </div>
+        </div>
+    }
+    else if (perfilUsuario != null)
+    {
+        <!-- Contenido principal con sistema de pestañas -->
+        <RadzenAlert AlertStyle="AlertStyle.Primary" Text="Sea muy preciso con la información en su perfil. Esta será presentada parcialmente para todos los consumidores de Axotl Xires."></RadzenAlert>
+        <RadzenTabs>
+            
+            <Tabs>
+                <RadzenTabsItem Text="Ver Perfil" Icon="visibility" Selected="!editando">
+                    <div class="row mt-4">
+                        <!-- Panel izquierdo - Información personal -->
+                        <div class="col-lg-4 mb-4">
+                            <RadzenCard class="h-100">
+                                <div class="text-center mb-4">
+                                    <!-- Foto de perfil -->
+                                    <div class="d-flex justify-content-center mb-3">
+                                        @if (!string.IsNullOrEmpty(imagenPerfilBase64))
+                                        {
+                                            <!-- Mostrar la imagen cargada desde la API -->
+                                            <img src="@($"data:image/jpeg;base64,{imagenPerfilBase64}")"
+                                                 style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover;"
+                                                 alt="Foto de perfil" />
+                                        }
+                                        else
+                                        {
+                                            <!-- Mostrar imagen por defecto -->
+                                            <RadzenIcon Icon="person" style="font-size: 150px; color: #612c7d;" />
+                                        }
+                                    </div>
+
+                                    <h4 class="mt-3">@perfilUsuario.Nombre</h4>
+                                    <div class="badge bg-primary mb-2">@perfilUsuario.Rol.ToUpper()</div>
+                                    <p class="text-muted">@perfilUsuario.Nombramiento</p>
+                                </div>
+
+                                <hr />
+
+                                <!-- Información de contacto y cuenta -->
+                                <h5>Información de cuenta</h5>
+                                <div class="mb-3">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <RadzenIcon Icon="email" class="me-2" />
+                                        <span>@perfilUsuario.Correo</span>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <RadzenIcon Icon="event" class="me-2" />
+                                        <span>Registrado el @perfilUsuario.FechaCreacion.ToString("dd/MM/yyyy")</span>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <RadzenIcon Icon="access_time" class="me-2" />
+                                        <span>Último acceso: @(string.IsNullOrEmpty(perfilUsuario.UltimoAcceso) ? "No disponible" : perfilUsuario.UltimoAcceso)</span>
+                                    </div>
+                                </div>
+
+                                <!-- Botones de acción -->
+                                <div class="d-grid gap-2 mt-3">
+                                    <RadzenButton Text="Editar perfil" Icon="edit" Click="@(() => editando = true)"
+                                                  ButtonStyle="ButtonStyle.Primary"
+                                                  Disabled="@(!esPerfilPropio)" />
+
+                                    <RadzenButton Text="Cambiar contraseña" Icon="lock"
+                                                  ButtonStyle="ButtonStyle.Light"
+                                                  Click="@MostrarCambioContrasena"
+                                                  Disabled="@(!esPerfilPropio)" />
+                                </div>
+                            </RadzenCard>
+                        </div>
+
+                        <!-- Panel derecho - Estadísticas -->
+                        <div class="col-lg-8">
+                            <!-- Estadísticas del usuario -->
+                            <RadzenCard class="mb-4">
+                                <h5>Estadísticas</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="d-flex align-items-center">
+                                            <div class="rounded-circle bg-success bg-opacity-25 p-3 me-3">
+                                                <RadzenIcon Icon="article" Style="color: var(--rz-success); font-size: 1.5rem;" />
+                                            </div>
+                                            <div>
+                                                <h3 class="mb-0">@perfilUsuario.Estadisticas.TotalPublicaciones</h3>
+                                                <small class="text-muted">Publicaciones</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="d-flex align-items-center">
+                                            <div class="rounded-circle bg-info bg-opacity-25 p-3 me-3">
+                                                <RadzenIcon Icon="rate_review" Style="color: var(--rz-info); font-size: 1.5rem;" />
+                                            </div>
+                                            <div>
+                                                <h3 class="mb-0">@perfilUsuario.Estadisticas.TotalRevisiones</h3>
+                                                <small class="text-muted">Revisiones</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </RadzenCard>
+
+                            <!-- Información adicional -->
+                            <RadzenCard>
+                                <h5>Detalles del usuario</h5>
+
+                                <div class="mb-3">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <p class="mb-1 fw-bold">ID Usuario:</p>
+                                            <p>@perfilUsuario.IdUsuario</p>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <p class="mb-1 fw-bold">Rol:</p>
+                                            <p>@perfilUsuario.Rol</p>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <p class="mb-1 fw-bold">Estado:</p>
+                                            <p>
+                                                <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Activo" />
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                @if (esPerfilPropio)
+                                {
+                                    <div class="alert alert-info" role="alert">
+                                        <div class="d-flex">
+                                            <RadzenIcon Icon="info" class="me-2" />
+                                            <div>
+                                                <p class="mb-0">Este es tu perfil de usuario. Puedes editarlo utilizando la pestaña "Editar Perfil" o el botón "Editar perfil".</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="alert alert-warning" role="alert">
+                                        <div class="d-flex">
+                                            <RadzenIcon Icon="lock" class="me-2" />
+                                            <div>
+                                                <p class="mb-0">Estás viendo el perfil de otro usuario. No puedes editarlo.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </RadzenCard>
+                        </div>
+                    </div>
+                </RadzenTabsItem>
+
+                <RadzenTabsItem Text="Editar Perfil" Icon="edit" Selected="editando" Visible="esPerfilPropio">
+                    <RadzenCard class="mt-4">
+                        <h5>Editar información personal</h5>
+                        <p class="text-muted mb-4">Modifique su información personal a continuación y guarde los cambios.</p>
+
+                        <div class="row mb-4">
+                            <div class="col-lg-4 mb-4">
+                                <div class="text-center">
+                                    <!-- Foto de perfil con opción para cambiarla -->
+                                    <div class="position-relative d-inline-block">
+                                        @if (!string.IsNullOrEmpty(imagenPerfilBase64))
+                                        {
+                                            <!-- Mostrar la imagen cargada desde la API -->
+                                            <img src="@($"data:image/jpeg;base64,{imagenPerfilBase64}")"
+                                                 style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover;"
+                                                 alt="Foto de perfil" />
+                                        }
+                                        else
+                                        {
+                                            <!-- Mostrar imagen por defecto -->
+                                            <RadzenIcon Icon="person" style="font-size: 150px; color: #612c7d;" />
+                                        }
+
+                                        <!-- Botón para cambiar la foto que ahora muestra un diálogo -->
+                                        <div class="position-absolute bottom-0 end-0">
+                                            <RadzenButton Icon="photo_camera" ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Medium"
+                                                          Click="@MostrarDialogoCambiarFoto" Title="Cambiar foto de perfil" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-8">
+                                <div class="mb-3">
+                                    <label for="nombre" class="form-label">Nombre completo</label>
+                                    <RadzenTextBox id="nombre" @bind-Value="@nombreEdicion" Style="width: 100%;" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="nombramiento" class="form-label">Cargo / Nombramiento</label>
+                                    <RadzenTextBox id="nombramiento" @bind-Value="@nombramientoEdicion" Style="width: 100%;" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Correo electrónico</label>
+                                    <RadzenTextBox Value="@perfilUsuario.Correo" Style="width: 100%;" Disabled="true" />
+                                    <small class="text-muted">El correo electrónico no puede ser modificado.</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Rol</label>
+                                    <RadzenTextBox Value="@perfilUsuario.Rol" Style="width: 100%;" Disabled="true" />
+                                    <small class="text-muted">El rol solo puede ser modificado por un administrador.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <RadzenButton Text="Cancelar" ButtonStyle="ButtonStyle.Light" Click="@CancelarEdicion" Class="me-2" Disabled="@guardando" />
+                            <RadzenButton Text="Guardar cambios" ButtonStyle="ButtonStyle.Primary" Click="@GuardarCambios" Disabled="@guardando" />
+                        </div>
+                    </RadzenCard>
+                </RadzenTabsItem>
+            </Tabs>
+        </RadzenTabs>
+    }
+</div>
+
+<!-- Modal para cambio de contraseña -->
+@if (mostrarModalContrasena)
+{
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal fade show" tabindex="-1" style="display: block;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Cambiar contraseña</h5>
+                    <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Class="p-0 m-0" Click="@OcultarCambioContrasena" />
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="nuevaContrasena" class="form-label">Nueva contraseña</label>
+                        <RadzenPassword id="nuevaContrasena" @bind-Value="@nuevaContrasena" Style="width: 100%;" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirmacion" class="form-label">Confirmar contraseña</label>
+                        <RadzenPassword id="confirmacion" @bind-Value="@confirmacionContrasena" Style="width: 100%;" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(mensajeErrorContrasena))
+                    {
+                        <div class="alert alert-danger mt-3">
+                            @mensajeErrorContrasena
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <RadzenButton Text="Cancelar" ButtonStyle="ButtonStyle.Light" Click="@OcultarCambioContrasena" Disabled="@guardando" />
+                    <RadzenButton Text="Cambiar contraseña" ButtonStyle="ButtonStyle.Primary" Click="@CambiarContrasena" Disabled="@guardando" />
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    #region Parámetros y variables
+
+    // Parámetro de ruta
+    [Parameter] public int IdUsuarioRuta { get; set; }
+
+    // Variables para almacenar los datos del perfil
+    private PerfilAdministrativo perfilUsuario;
+    private int usuarioAutenticadoId;
+    private string imagenPerfilBase64;
+
+    // Variables para edición de información
+    private string nombreEdicion;
+    private string nombramientoEdicion;
+    private bool editando = false;
+
+    // Variables para cambio de contraseña
+    private string nuevaContrasena;
+    private string confirmacionContrasena;
+    private bool mostrarModalContrasena = false;
+    private string mensajeErrorContrasena;
+
+    // Variables para control de estado
+    private bool cargando = true;
+    private bool guardando = false;
+    private bool error = false;
+    private bool accesoDenegado = false;
+    private bool esPerfilPropio = false;
+    private string mensajeError;
+
+    #endregion
+
+    #region Ciclo de vida del componente
+
+    /// <summary>
+    /// Método que se ejecuta al inicializar el componente
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+        await ObtenerIdUsuarioAutenticado();
+        await VerificarAccesoYCargarPerfil();
+    }
+
+    #endregion
+
+    #region Métodos para verificación de acceso y carga de datos
+
+    /// <summary>
+    /// Obtiene el ID del usuario autenticado desde los datos de autenticación
+    /// </summary>
+    private async Task ObtenerIdUsuarioAutenticado()
+    {
+        try
+        {
+            var datosUsuarioJson = await AuthService.ObtenerDatosUsuario();
+            if (!string.IsNullOrEmpty(datosUsuarioJson))
+            {
+                // Deserializar los datos del usuario
+                var datosUsuario = JsonDocument.Parse(datosUsuarioJson);
+                usuarioAutenticadoId = datosUsuario.RootElement.TryGetProperty("id", out var idElement) ? idElement.GetInt32() : 0;
+            }
+
+            // Si no se pudo obtener el ID, redirigir al login
+            if (usuarioAutenticadoId == 0)
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "No se pudo identificar al usuario actual");
+                NavigationManager.NavigateTo("/");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al obtener datos de usuario: {ex.Message}");
+            NavigationManager.NavigateTo("/");
+        }
+    }
+
+    /// <summary>
+    /// Verifica si el usuario actual tiene acceso al perfil solicitado
+    /// </summary>
+    private async Task VerificarAccesoYCargarPerfil()
+    {
+        // Verificar si el ID de ruta coincide con el ID del usuario autenticado
+        esPerfilPropio = (IdUsuarioRuta == usuarioAutenticadoId);
+
+        // Si es el mismo usuario, cargar el perfil normalmente
+        if (esPerfilPropio)
+        {
+            await CargarPerfilUsuario();
+        }
+        else
+        {
+            // Si es un usuario diferente, mostrar error de acceso denegado
+            error = true;
+            accesoDenegado = true;
+            mensajeError = "No tienes permiso para acceder al perfil de otro usuario. Solo puedes ver y editar tu propio perfil.";
+            cargando = false;
+        }
+    }
+
+    /// <summary>
+    /// Carga los datos del perfil del usuario
+    /// </summary>
+    private async Task CargarPerfilUsuario()
+    {
+        cargando = true;
+        error = false;
+        accesoDenegado = false;
+        StateHasChanged();
+
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            // Consultar el perfil del usuario
+            perfilUsuario = await administradoresUsuarios.ObtenerPerfilAdministrativoAsync(token, IdUsuarioRuta);
+
+            if (perfilUsuario != null)
+            {
+                // Inicializar variables de edición con los valores actuales
+                nombreEdicion = perfilUsuario.Nombre;
+                nombramientoEdicion = perfilUsuario.Nombramiento;
+
+                // Cargar la imagen de perfil
+                await CargarImagenPerfil(token);
+            }
+            else
+            {
+                error = true;
+                mensajeError = "No se pudo cargar la información del perfil";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = true;
+            mensajeError = $"Error al cargar el perfil: {ex.Message}";
+            Console.WriteLine($"Error en CargarPerfilUsuario: {ex}");
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Carga la imagen de perfil del usuario
+    /// </summary>
+    private async Task CargarImagenPerfil(string token)
+    {
+        try
+        {
+            // Crear instancia del servicio de consulta de imágenes
+            var servicioImagenes = new consultarImagenes();
+
+            // Obtener la imagen de perfil como bytes
+            var imagenBytes = await servicioImagenes.ObtenerImagenPerfilBytesAsync(token, IdUsuarioRuta);
+
+            if (imagenBytes != null && imagenBytes.Length > 0)
+            {
+                // Convertir a Base64 para mostrar en la imagen
+                imagenPerfilBase64 = Convert.ToBase64String(imagenBytes);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar imagen de perfil: {ex.Message}");
+            // No establecemos error general para permitir que la página se cargue sin la imagen
+        }
+    }
+
+    #endregion
+
+    #region Métodos de navegación
+
+    /// <summary>
+    /// Vuelve a la página anterior
+    /// </summary>
+    private void Volver()
+    {
+        NavigationManager.NavigateTo("/administrador/inicio");
+    }
+
+    /// <summary>
+    /// Navega al perfil del usuario autenticado
+    /// </summary>
+    private void IrAMiPerfil()
+    {
+        NavigationManager.NavigateTo($"/protected/usuarios/{usuarioAutenticadoId}");
+    }
+
+    #endregion
+
+    #region Métodos para gestión de información básica
+
+    /// <summary>
+    /// Guarda los cambios en la información básica del perfil
+    /// </summary>
+    private async Task GuardarCambios()
+    {
+        // Validaciones básicas
+        if (string.IsNullOrWhiteSpace(nombreEdicion))
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Validación", "El nombre no puede estar vacío");
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            // Actualizar la información básica
+            var respuesta = await administradoresUsuarios.ActualizarInformacionBasicaAsync(
+            token, IdUsuarioRuta, nombreEdicion, nombramientoEdicion);
+
+            if (respuesta.Status == "success")
+            {
+                // Recargar el perfil para mostrar los cambios
+                await CargarPerfilUsuario();
+                NotificationService.Notify(NotificationSeverity.Success, "Éxito", "Información actualizada correctamente");
+                editando = false; // Volver a la vista de detalles
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", respuesta.Mensaje);
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error al guardar cambios: {ex.Message}");
+        }
+        finally
+        {
+            guardando = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Cancela la edición, restaurando los valores originales
+    /// </summary>
+    private void CancelarEdicion()
+    {
+        if (perfilUsuario != null)
+        {
+            nombreEdicion = perfilUsuario.Nombre;
+            nombramientoEdicion = perfilUsuario.Nombramiento;
+        }
+        editando = false;
+    }
+
+    #endregion
+
+    #region Métodos para gestión de foto de perfil
+
+    /// <summary>
+    /// Muestra el diálogo con el mensaje para cambiar la foto de perfil
+    /// </summary>
+    private async Task MostrarDialogoCambiarFoto()
+    {
+        try
+        {
+            await DialogService.OpenAsync("Cambiar foto de perfil", ds =>
+    @<div>
+        <div class="text-center mb-4">
+            <RadzenIcon Icon="photo_camera" Style="font-size: 64px; color: #612c7d;" />
+            <h4 class="mt-3">Cambia tu foto de perfil en Axotl Xires</h4>
+            <p class="text-muted">
+                Para actualizar tu imagen de perfil, debes acceder
+                directamente a la plataforma principal de Axotl Xires.
+            </p>
+        </div>
+        <div class="d-flex justify-content-center">
+            <RadzenButton Text="Cerrar" Click="() => ds.Close(false)" ButtonStyle="ButtonStyle.Secondary" />
+        </div>
+    </div>,
+        new DialogOptions
+                {
+                    CloseDialogOnOverlayClick = true,
+                    Width = "400px",
+                    Height = "auto",
+                    CssClass = "rz-shadow-3"
+                });
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error al mostrar diálogo: {ex.Message}");
+        }
+    }
+
+    #endregion
+
+    #region Métodos para cambio de contraseña
+
+    /// <summary>
+    /// Muestra el modal de cambio de contraseña
+    /// </summary>
+    private void MostrarCambioContrasena()
+    {
+        if (!esPerfilPropio)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Acceso denegado",
+                "Solo puedes cambiar la contraseña de tu propio perfil");
+            return;
+        }
+
+        nuevaContrasena = string.Empty;
+        confirmacionContrasena = string.Empty;
+        mensajeErrorContrasena = string.Empty;
+        mostrarModalContrasena = true;
+    }
+
+    /// <summary>
+    /// Oculta el modal de cambio de contraseña
+    /// </summary>
+    private void OcultarCambioContrasena()
+    {
+        mostrarModalContrasena = false;
+    }
+
+    /// <summary>
+    /// Procesa el cambio de contraseña
+    /// </summary>
+    private async Task CambiarContrasena()
+    {
+        // Validaciones básicas
+        if (string.IsNullOrWhiteSpace(nuevaContrasena))
+        {
+            mensajeErrorContrasena = "La nueva contraseña no puede estar vacía";
+            return;
+        }
+
+        if (nuevaContrasena.Length < 8)
+        {
+            mensajeErrorContrasena = "La contraseña debe tener al menos 8 caracteres";
+            return;
+        }
+
+        if (nuevaContrasena != confirmacionContrasena)
+        {
+            mensajeErrorContrasena = "Las contraseñas no coinciden";
+            return;
+        }
+
+        guardando = true;
+        mensajeErrorContrasena = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            // Obtener token de autenticación
+            string token = await AuthService.ObtenerToken();
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            // Cambiar la contraseña
+            var respuesta = await administradoresUsuarios.CambiarContrasenaAsync(
+                token, IdUsuarioRuta, nuevaContrasena);
+
+            if (respuesta.Status == "success")
+            {
+                // Cerrar el modal y mostrar notificación
+                OcultarCambioContrasena();
+                NotificationService.Notify(NotificationSeverity.Success, "Éxito", "Contraseña actualizada correctamente");
+            }
+            else
+            {
+                mensajeErrorContrasena = respuesta.Mensaje;
+            }
+        }
+        catch (Exception ex)
+        {
+            mensajeErrorContrasena = $"Error al cambiar la contraseña: {ex.Message}";
+        }
+        finally
+        {
+            guardando = false;
+            StateHasChanged();
+        }
+    }
+
+    #endregion
+}

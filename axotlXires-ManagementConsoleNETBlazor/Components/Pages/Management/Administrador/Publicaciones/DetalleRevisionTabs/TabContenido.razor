@@ -1,6 +1,9 @@
 ﻿@using DAL.Modelos
+@using DAL.Consumo
 @using Radzen
 @using System.Linq
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@inject AuthService AuthService
 @inherits ComponentBase
 
 @if (DetallePublicacion != null)
@@ -23,14 +26,30 @@
         </div>
 
         <div class="col-md-4">
-            <!-- Imagen de portada, si existe -->
-            @if (!string.IsNullOrEmpty(DetallePublicacion.Publicacion.ImagenPortada))
-            {
-                <RadzenCard class="mb-4">
-                    <RadzenImage Path="@DetallePublicacion.Publicacion.ImagenPortada"
-                                 Style="width: 100%; border-radius: 4px;" />
-                </RadzenCard>
-            }
+            <!-- Imagen de portada -->
+            <RadzenCard class="mb-4">
+                <h5>Imagen de portada</h5>
+                <div class="mt-3 text-center">
+                    @if (imagenPortadaCargada != null)
+                    {
+                        <img src="@($"data:image/jpeg;base64,{imagenPortadaCargada}")"
+                             style="max-width: 100%; border-radius: 4px;"
+                             alt="Imagen de portada" />
+                    }
+                    else if (!string.IsNullOrEmpty(DetallePublicacion.Publicacion.ImagenPortada))
+                    {
+                        <RadzenImage Path="@DetallePublicacion.Publicacion.ImagenPortada"
+                                     Style="max-width: 100%; border-radius: 4px;" />
+                    }
+                    else
+                    {
+                        <div class="text-center p-4 bg-light rounded">
+                            <i class="bi bi-image" style="font-size: 3rem; color: #ccc;"></i>
+                            <p class="mt-3 text-muted">Sin imagen de portada</p>
+                        </div>
+                    }
+                </div>
+            </RadzenCard>
 
             <!-- Referencias -->
             <RadzenCard class="mb-4">
@@ -45,7 +64,17 @@
                 <h5>Sobre el autor</h5>
                 <div class="d-flex align-items-center mt-3">
                     <div class="me-3">
-                        <RadzenIcon Icon="person" Style="font-size: 2rem;" />
+                        @if (imagenPerfilAutorCargada != null)
+                        {
+                            <!-- IMPLEMENTACIÓN DE FOTO DE PERFIL: Mostramos la imagen del autor desde bytes cargados a base64 -->
+                            <img src="@($"data:image/jpeg;base64,{imagenPerfilAutorCargada}")"
+                                 style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;"
+                                 alt="Foto de perfil del autor" />
+                        }
+                        else
+                        {
+                            <RadzenIcon Icon="person" Style="font-size: 2rem;" />
+                        }
                     </div>
                     <div>
                         <div><strong>@DetallePublicacion.Publicacion.Autor</strong></div>
@@ -59,6 +88,102 @@
 
 @code {
     [Parameter] public DetallePublicacion DetallePublicacion { get; set; }
+
+    // IMPLEMENTACIÓN DE CARGA DE IMÁGENES: Servicio para consultar imágenes y variables para almacenar las imágenes
+    private readonly consultarImagenes _servicioImagenes = new consultarImagenes();
+    private string imagenPortadaCargada;
+    private string imagenPerfilAutorCargada;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // IMPLEMENTACIÓN DE CARGA DE IMÁGENES: Cargar imágenes cuando cambian los parámetros
+        await CargarImagenes();
+    }
+
+    /// <summary>
+    /// IMPLEMENTACIÓN DE CARGA DE IMÁGENES: Carga todas las imágenes necesarias para la publicación
+    /// </summary>
+    private async Task CargarImagenes()
+    {
+        try
+        {
+            // Verificar que tengamos datos de publicación
+            if (DetallePublicacion?.Publicacion == null)
+                return;
+
+            // Obtener el token de autenticación
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+                return;
+
+            // Cargar la imagen de portada y la foto del autor en paralelo para mejorar rendimiento
+            var tareaImagenPortada = CargarImagenPortada(token);
+            var tareaImagenPerfil = CargarImagenPerfilAutor(token);
+
+            await Task.WhenAll(tareaImagenPortada, tareaImagenPerfil);
+        }
+        catch (Exception ex)
+        {
+            // Manejar errores generales
+            Console.WriteLine($"Error al cargar imágenes: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// IMPLEMENTACIÓN DE CARGA DE IMÁGENES: Carga la imagen de portada desde la API
+    /// </summary>
+    private async Task CargarImagenPortada(string token)
+    {
+        try
+        {
+            if (DetallePublicacion.Publicacion.IdPublicacion <= 0)
+                return;
+
+            // Cargar la imagen de portada como bytes
+            var imagenBytes = await _servicioImagenes.ObtenerImagenPortadaBytesAsync(token, DetallePublicacion.Publicacion.IdPublicacion);
+
+            if (imagenBytes != null && imagenBytes.Length > 0)
+            {
+                // Convertir a Base64 para mostrar en la imagen
+                imagenPortadaCargada = Convert.ToBase64String(imagenBytes);
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Si ocurre un error, lo manejamos silenciosamente y dejamos que se use la URL original si existe
+            Console.WriteLine($"Error al cargar imagen de portada: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// IMPLEMENTACIÓN DE CARGA DE IMÁGENES: Carga la imagen de perfil del autor desde la API
+    /// </summary>
+    private async Task CargarImagenPerfilAutor(string token)
+    {
+        try
+        {
+            // Verificar que tengamos el ID del autor
+            if (DetallePublicacion.Publicacion.IdAutor <= 0)
+                return;
+
+            // Cargar la imagen de perfil del autor como bytes
+            var imagenBytes = await _servicioImagenes.ObtenerImagenPerfilBytesAsync(token, DetallePublicacion.Publicacion.IdAutor);
+
+            if (imagenBytes != null && imagenBytes.Length > 0)
+            {
+                // Convertir a Base64 para mostrar en la imagen
+                imagenPerfilAutorCargada = Convert.ToBase64String(imagenBytes);
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Si ocurre un error, lo manejamos silenciosamente y mostramos el icono por defecto
+            Console.WriteLine($"Error al cargar imagen de perfil del autor: {ex.Message}");
+        }
+    }
 
     private string FormatearReferencias(string referencias)
     {

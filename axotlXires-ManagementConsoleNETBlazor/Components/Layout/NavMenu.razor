@@ -4,13 +4,13 @@
     </div>
 </div>
 
-<RadzenPanelMenu Style="height: calc(100vh - 56px); overflow-y: auto;" ExpandMode="PanelMenuExpandMode.Single">
+<RadzenPanelMenu Style="height: calc(100vh - 56px); overflow-y: auto;" ExpandMode="PanelMenuExpandMode.Full">
     <br />
     <!-- INICIO -->
     <RadzenPanelMenuItem Icon="home" Text="Inicio" Path="administrador/inicio" />
 
     <!-- USUARIOS -->
-    <RadzenPanelMenuItem Icon="people" Text="Usuarios">
+    <RadzenPanelMenuItem Icon="people" Text="Usuarios" >
         <RadzenPanelMenuItem Text="Lista de Usuarios" Path="administrador/usuarios" Icon="list" />
         <RadzenPanelMenuItem Text="Roles" Path="administrador/usuarios/roles" Icon="security" />
     </RadzenPanelMenuItem>

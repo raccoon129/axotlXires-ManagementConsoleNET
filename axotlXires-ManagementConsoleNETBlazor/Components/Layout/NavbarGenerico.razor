@@ -1,4 +1,11 @@
 ﻿@inherits LayoutComponentBase
+@using DAL.Modelos
+@using DAL.Consumo
+@using System.Text.Json
+@using axotlXires_ManagementConsoleNETBlazor.Services
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
 
 <header class="cabecera-navbar">
     <nav class="contenedor-navbar">
@@ -34,16 +41,26 @@
                     <!-- Menú de usuario -->
                     <div class="menu-usuario-navbar">
                         <button @onclick="AlternarMenuUsuario" class="boton-usuario-navbar">
-                            <div class="avatar-usuario-navbar">
-                                <i class="fa fa-user"></i>
-                            </div>
+                            @if (!string.IsNullOrEmpty(imagenPerfilBase64))
+                            {
+                                <!-- Mostrar la imagen de perfil cargada desde la API -->
+                                <img src="@($"data:image/jpeg;base64,{imagenPerfilBase64}")"
+                                     class="avatar-usuario-navbar"
+                                     alt="Foto de perfil" />
+                            }
+                            else
+                            {
+                                <div class="avatar-usuario-navbar">
+                                    <i class="fa fa-user"></i>
+                                </div>
+                            }
                             <span class="nombre-usuario-navbar">@nombreUsuario</span>
                         </button>
 
                         @if (mostrarMenuUsuario)
                         {
                             <div class="desplegable-usuario-navbar">
-                                <a href="/perfil" class="item-desplegable-navbar">
+                                <a href="@($"/protected/usuarios/{usuarioId}")" class="item-desplegable-navbar">
                                     <i class="fa fa-user"></i>
                                     Mi Perfil
                                 </a>
@@ -194,6 +211,7 @@
         align-items: center;
         justify-content: center;
         color: white;
+        object-fit: cover;
     }
 
     .nombre-usuario-navbar {
@@ -245,8 +263,92 @@
 
 @code {
     private bool mostrarMenuUsuario = false;
-    private bool estaAutenticado = true; // Temporalmente establecido en true
-    private string nombreUsuario = "Administrador";
+    private bool estaAutenticado = false;
+    private string nombreUsuario = string.Empty;
+    private int usuarioId = 0;
+    private string imagenPerfilBase64;
+
+    // Instancia del servicio para consultar imágenes
+    private readonly consultarImagenes _servicioImagenes = new consultarImagenes();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Inicializar el servicio de autenticación
+        await AuthService.InitializeAsync();
+        await CargarDatosUsuario();
+    }
+
+    /// <summary>
+    /// Carga los datos del usuario autenticado
+    /// </summary>
+    private async Task CargarDatosUsuario()
+    {
+        try
+        {
+            // Verificar si hay un token activo
+            var token = await AuthService.ObtenerToken();
+            if (!string.IsNullOrEmpty(token))
+            {
+                estaAutenticado = true;
+
+                // Obtener datos del usuario desde localStorage
+                var datosUsuarioJson = await AuthService.ObtenerDatosUsuario();
+                if (!string.IsNullOrEmpty(datosUsuarioJson))
+                {
+                    // Deserializar los datos del usuario
+                    var datosUsuario = JsonDocument.Parse(datosUsuarioJson);
+
+                    // Extraer el nombre y el ID
+                    nombreUsuario = datosUsuario.RootElement.GetProperty("nombre").GetString() ?? "Usuario";
+                    usuarioId = datosUsuario.RootElement.TryGetProperty("id", out var idElement) ?
+                                idElement.GetInt32() : 0;
+
+                    // Cargar la imagen de perfil
+                    await CargarImagenPerfil(token, usuarioId);
+                }
+                else
+                {
+                    nombreUsuario = "Usuario";
+                }
+            }
+            else
+            {
+                estaAutenticado = false;
+                nombreUsuario = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar datos de usuario: {ex.Message}");
+            estaAutenticado = false;
+            nombreUsuario = "Error";
+        }
+    }
+
+    /// <summary>
+    /// Carga la imagen de perfil del usuario actual
+    /// </summary>
+    private async Task CargarImagenPerfil(string token, int idUsuario)
+    {
+        if (idUsuario <= 0) return;
+
+        try
+        {
+            // Obtener la imagen como array de bytes
+            var imagenBytes = await _servicioImagenes.ObtenerImagenPerfilBytesAsync(token, idUsuario);
+
+            if (imagenBytes != null && imagenBytes.Length > 0)
+            {
+                // Convertir a Base64 para mostrar en la imagen
+                imagenPerfilBase64 = Convert.ToBase64String(imagenBytes);
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar imagen de perfil: {ex.Message}");
+        }
+    }
 
     private void AlternarMenuUsuario()
     {
@@ -255,7 +357,20 @@
 
     private async Task CerrarSesion()
     {
-        // Implementar lógica de cierre de sesión aquí
-        // NavigationManager.NavigateTo("/login");
+        try
+        {
+            // Cerrar la sesión usando el servicio de autenticación
+            await AuthService.CerrarSesion();
+
+            // Mostrar un mensaje antes de redirigir
+            await JSRuntime.InvokeVoidAsync("alert", "Sesión cerrada correctamente");
+
+            // Redirigir al login
+            NavigationManager.NavigateTo("/", true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cerrar sesión: {ex.Message}");
+        }
     }
 }
