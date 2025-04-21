@@ -54,7 +54,7 @@
                             <div>
                                 <p class="mb-1"><strong>Revisión anterior:</strong></p>
                                 <p class="mb-0">
-                                    <strong>Tipo:</strong> @UltimaRevisionFinalizada.TipoRevision
+                                    <strong>Detalle:</strong> @UltimaRevisionFinalizada.TipoRevision
                                 </p>
                                 <p class="mb-0">
                                     <strong>Descripción:</strong> @UltimaRevisionFinalizada.DescripcionRevision
@@ -67,38 +67,17 @@
                     </div>
                 }
 
-                <!-- Mostrar información de revisión activa si existe -->
-                @if (RevisionActiva != null)
-                {
-                    <div class="alert alert-info mb-4">
-                        <div class="d-flex">
-                            <div class="me-2"><i class="bi bi-info-circle-fill"></i></div>
-                            <div>
-                                <p class="mb-0">
-                                    <strong>Tipo de revisión:</strong> @RevisionActiva.TipoRevision
-                                </p>
-                                <p class="mb-0">
-                                    <strong>Descripción:</strong> @RevisionActiva.DescripcionRevision
-                                </p>
-                                <p class="mb-0 text-muted">
-                                    Iniciada el @RevisionActiva.FechaCreacion.ToString("dd/MM/yyyy HH:mm")
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                }
-
-                <!-- Siempre mostrar los campos de tipo de revisión y descripción, independientemente
+                <!-- Siempre mostrar los campos de detalle de revisión y descripción, independientemente
                      de si hay una revisión activa o no -->
                 <div class="mt-4">
-                    <RadzenText TextStyle="TextStyle.Subtitle2">Tipo de revisión</RadzenText>
-                    <RadzenTextBox @bind-Value="TipoRevisionTexto"
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Detalle de revisión</RadzenText>
+                    <RadzenTextBox @bind-Value="DetalleRevisionTexto"
                                    Placeholder="Ejemplo: Ortografía, Contenido, Referencias, etc."
                                    Style="width: 100%;" />
-                    @if (string.IsNullOrEmpty(TipoRevisionTexto))
+                    @if (string.IsNullOrEmpty(DetalleRevisionTexto))
                     {
                         <div class="text-danger small mt-1">
-                            El tipo de revisión es obligatorio
+                            El detalle de revisión es obligatorio
                         </div>
                     }
                 </div>
@@ -183,8 +162,16 @@
                                   Icon="check_circle"
                                   ButtonStyle="ButtonStyle.Success"
                                   Click="@FinalizarRevisionHandler"
-                                  Disabled="@(!PuedeFinalizarRevision())" />
+                                  Disabled="@(!PuedeFinalizarRevision() || Procesando)" />
                 </div>
+
+                @if (Procesando)
+                {
+                    <div class="text-center mt-3">
+                        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+                        <p class="text-muted mt-2">Procesando revisión...</p>
+                    </div>
+                }
             </RadzenCard>
 
             <!-- Instrucciones y mejores prácticas para realizar revisiones -->
@@ -349,13 +336,14 @@
     // Eventos para comunicarse con el componente padre
     [Parameter] public EventCallback<RevisionResultado> OnFinalizarRevision { get; set; }
     [Parameter] public EventCallback OnCancelarRevision { get; set; }
-    [Parameter] public EventCallback<RevisionInicioData> OnIniciarNuevaRevision { get; set; }
+    [Parameter] public EventCallback<bool> OnRevisionCompletada { get; set; }
 
     // Variables locales para manejar el estado del formulario
-    private string TipoRevisionTexto { get; set; } = string.Empty;
+    private string DetalleRevisionTexto { get; set; } = string.Empty;
     private string DescripcionRevision { get; set; } = string.Empty;
     private string ComentarioRevision { get; set; } = string.Empty;
     private string DecisionRevision { get; set; } = string.Empty;
+    private bool Procesando { get; set; } = false;
 
     // Obtener la última revisión finalizada (si existe)
     private RevisionCompleta UltimaRevisionFinalizada
@@ -381,9 +369,9 @@
     protected override void OnInitialized()
     {
         // Inicializar con datos de la revisión anterior si existe
-        if (UltimaRevisionFinalizada != null && string.IsNullOrEmpty(TipoRevisionTexto))
+        if (UltimaRevisionFinalizada != null && string.IsNullOrEmpty(DetalleRevisionTexto))
         {
-            TipoRevisionTexto = UltimaRevisionFinalizada.TipoRevision;
+            DetalleRevisionTexto = UltimaRevisionFinalizada.TipoRevision;
             DescripcionRevision = UltimaRevisionFinalizada.DescripcionRevision;
         }
     }
@@ -394,7 +382,7 @@
     private bool PuedeFinalizarRevision()
     {
         // Siempre verificar que todos los campos estén completos
-        return !string.IsNullOrWhiteSpace(TipoRevisionTexto) &&
+        return !string.IsNullOrWhiteSpace(DetalleRevisionTexto) &&
                !string.IsNullOrWhiteSpace(DescripcionRevision) &&
                !string.IsNullOrWhiteSpace(ComentarioRevision) &&
                !string.IsNullOrEmpty(DecisionRevision);
@@ -413,35 +401,62 @@
             return;
         }
 
-        // Si no hay una revisión activa, primero debemos iniciarla
-        if (RevisionActiva == null)
+        Procesando = true;
+        try
         {
-            // Crear objeto para iniciar la revisión
-            var datosInicio = new RevisionInicioData
+            string token = await AuthService.ObtenerToken();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error de autenticación",
+                    "Su sesión ha expirado. Por favor, inicie sesión nuevamente.");
+                return;
+            }
+
+            // Ejecutar el proceso completo de revisión usando la nueva ruta unificada
+            var respuesta = await revisionPublicaciones.EjecutarProcesoRevisionAsync(
+                token,
+                IdPublicacion,
+                DetalleRevisionTexto.Trim(),
+                DescripcionRevision.Trim(),
+                ComentarioRevision.Trim(),
+                DecisionRevision
+            );
+
+            if (respuesta.Status == "success")
+            {
+                // Mostrar notificación de éxito
+                string mensajeResultado = DecisionRevision switch
                 {
-                    TipoRevision = TipoRevisionTexto.Trim(),
-                    DescripcionRevision = DescripcionRevision.Trim(),
-                    ComentarioInicial = ComentarioRevision.Trim() // Usar el comentario de retroalimentación como inicial
+                    var d when d == DECISION_APROBAR => "La publicación ha sido aprobada y será visible para todos los usuarios.",
+                    var d when d == DECISION_SOLICITAR_CAMBIOS => "Se han solicitado cambios al autor para mejorar la publicación.",
+                    var d when d == DECISION_RECHAZAR => "La publicación ha sido rechazada. El autor deberá crear una nueva publicación.",
+                    _ => "El proceso de revisión ha sido completado."
                 };
 
-            // Invocar el evento para iniciar la revisión
-            await OnIniciarNuevaRevision.InvokeAsync(datosInicio);
+                NotificationService.Notify(NotificationSeverity.Success, "Revisión completada", mensajeResultado);
+
+                // Invocar el evento para notificar al componente padre
+                await OnRevisionCompletada.InvokeAsync(true);
+
+                // Limpiar el formulario
+                LimpiarFormulario();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error",
+                    respuesta.Mensaje ?? "Ha ocurrido un error al procesar la revisión.");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            // Crear el objeto resultado con la decisión y el comentario
-            var resultado = new RevisionResultado
-                {
-                    Decision = DecisionRevision,
-                    Comentario = ComentarioRevision
-                };
-
-            // Invocar el evento del componente padre pasando el resultado
-            await OnFinalizarRevision.InvokeAsync(resultado);
+            NotificationService.Notify(NotificationSeverity.Error, "Error",
+                $"Error al procesar la revisión: {ex.Message}");
         }
-
-        // Limpiar el formulario
-        LimpiarFormulario();
+        finally
+        {
+            Procesando = false;
+        }
     }
 
     /// <summary>
@@ -449,7 +464,7 @@
     /// </summary>
     private void LimpiarFormulario()
     {
-        TipoRevisionTexto = string.Empty;
+        DetalleRevisionTexto = string.Empty;
         DescripcionRevision = string.Empty;
         ComentarioRevision = string.Empty;
         DecisionRevision = string.Empty;
@@ -469,26 +484,5 @@
         /// Comentario detallado de retroalimentación para el autor
         /// </summary>
         public string Comentario { get; set; }
-    }
-
-    /// <summary>
-    /// Clase para encapsular los datos de inicio de una revisión
-    /// </summary>
-    public class RevisionInicioData
-    {
-        /// <summary>
-        /// Tipo de revisión ingresado por el usuario
-        /// </summary>
-        public string TipoRevision { get; set; }
-
-        /// <summary>
-        /// Descripción de la revisión
-        /// </summary>
-        public string DescripcionRevision { get; set; }
-
-        /// <summary>
-        /// Comentario inicial
-        /// </summary>
-        public string ComentarioInicial { get; set; }
     }
 }

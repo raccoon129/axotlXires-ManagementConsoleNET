@@ -79,10 +79,11 @@
         return aprobado switch
         {
             true => "APROBADO",
-            false => "CAMBIOS SOLICITADOS",
+            false => "RECHAZADO", // Antes era "CAMBIOS SOLICITADOS"
             _ => "EN PROCESO"
         };
     }
+
 
     private string ObtenerClaseEstadoRevision(bool? aprobado)
     {

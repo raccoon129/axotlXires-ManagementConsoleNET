@@ -69,9 +69,9 @@
                                              TiposRevision="@detallePublicacion.TiposRevision"
                                              IdPublicacion="@IdPublicacion"
                                              UrlVisualizacion="@($"{Parametros.UrlBaseApi}/api/management/visualizar/{IdPublicacion}")"
-                                             OnFinalizarRevision="FinalizarRevisionHandler"
                                              OnCancelarRevision="@(() => CancelarRevision())"
-                                             OnIniciarNuevaRevision="IniciarNuevaRevision" />
+                                             OnRevisionCompletada="@OnRevisionCompletadaHandler" />
+
                     </RadzenTabsItem>
                 }
             </Tabs>
@@ -212,136 +212,26 @@
 
     private void VolverAListado() => NavigationManager.NavigateTo("/administrador/publicaciones/pendientes");
 
-    // private void SeleccionarTipoRevision(int id)
-    // {
-    //     tipoRevisionSeleccionado = id;
-    //     StateHasChanged();
-    // }
-
     /// <summary>
-    /// Inicia una nueva revisión con los datos proporcionados
+    /// Manejador para cuando se completa una revisión mediante el proceso unificado
     /// </summary>
-    private async Task IniciarNuevaRevision(TabRealizarRevision.RevisionInicioData datos)
+    private async Task OnRevisionCompletadaHandler(bool exito)
     {
-        if (string.IsNullOrWhiteSpace(datos.TipoRevision) ||
-            string.IsNullOrWhiteSpace(datos.DescripcionRevision) ||
-            string.IsNullOrWhiteSpace(datos.ComentarioInicial))
+        if (exito)
         {
-            NotificationService.Notify(NotificationSeverity.Warning, "Datos incompletos",
-                "Debe proporcionar el tipo de revisión, la descripción y un comentario inicial.");
-            return;
-        }
+            var confirmacion = await DialogService.Confirm(
+                "¿Desea volver al listado de publicaciones pendientes?",
+                "Revisión completada",
+                new ConfirmOptions { OkButtonText = "Sí", CancelButtonText = "No" });
 
-        try
-        {
-            string token = await AuthService.ObtenerToken();
-            if (string.IsNullOrEmpty(token))
+            if (confirmacion == true)
             {
-                NavigationManager.NavigateTo("/");
-                return;
+                VolverAListado();
             }
-
-            // Aquí necesitamos crear un nuevo TipoRevision o usar uno existente
-            // Para simplificar, asumimos que se creará un nuevo tipo de revisión en el backend
-
-            // Realizar petición para iniciar revisión con los datos proporcionados
-            var respuesta = await revisionPublicaciones.IniciarRevisionCustomAsync(
-                token,
-                IdPublicacion,
-                datos.TipoRevision,
-                datos.DescripcionRevision,
-                datos.ComentarioInicial);
-
-            if (respuesta.Status == "success")
+            else
             {
-                NotificationService.Notify(NotificationSeverity.Success, "Éxito", "Se ha iniciado la revisión correctamente");
                 await CargarDetallePublicacion();
             }
-            else
-            {
-                NotificationService.Notify(NotificationSeverity.Error, "Error", respuesta.Mensaje ?? "No se pudo iniciar la revisión");
-            }
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error al iniciar revisión: {ex.Message}");
-        }
-    }
-
-    private async Task FinalizarRevisionHandler(TabRealizarRevision.RevisionResultado resultado)
-    {
-        if (revisionActiva == null)
-        {
-            NotificationService.Notify(NotificationSeverity.Warning, "Atención", "No hay una revisión activa para finalizar");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(resultado.Comentario) || string.IsNullOrEmpty(resultado.Decision))
-        {
-            NotificationService.Notify(NotificationSeverity.Warning, "Atención", "Debe ingresar un comentario y seleccionar una decisión");
-            return;
-        }
-
-        try
-        {
-            string token = await AuthService.ObtenerToken();
-            if (string.IsNullOrEmpty(token))
-            {
-                NavigationManager.NavigateTo("/");
-                return;
-            }
-
-            var respuesta = await revisionPublicaciones.FinalizarRevisionAsync(
-                token,
-                revisionActiva.IdRevision,
-                resultado.Decision,
-                resultado.Comentario);
-
-            if (respuesta.Status == "success")
-            {
-                NotificationService.Notify(NotificationSeverity.Success, "Éxito", "Revisión finalizada correctamente");
-
-                // Mensaje específico según la decisión tomada
-                string decisionMensaje;
-                if (resultado.Decision == DAL.Modelos.DecisionRevision.Aprobar)
-                {
-                    decisionMensaje = "La publicación ha sido aprobada y será visible para todos los usuarios";
-                }
-                else if (resultado.Decision == DAL.Modelos.DecisionRevision.SolicitarCambios)
-                {
-                    decisionMensaje = "Se han solicitado cambios al autor para mejorar la publicación";
-                }
-                else // Rechazar
-                {
-                    decisionMensaje = "La publicación ha sido rechazada. El autor deberá crear una nueva publicación.";
-                }
-
-                NotificationService.Notify(NotificationSeverity.Info, "Información", decisionMensaje);
-
-                var confirmacion = await DialogService.Confirm(
-                    "¿Desea volver al listado de publicaciones pendientes?",
-                    "Revisión completada",
-                    new ConfirmOptions { OkButtonText = "Sí", CancelButtonText = "No" });
-
-                if (confirmacion == true)
-                {
-                    VolverAListado();
-                }
-                else
-                {
-                    await CargarDetallePublicacion();
-                }
-            }
-            else
-            {
-                NotificationService.Notify(NotificationSeverity.Error, "Error",
-                    respuesta.Mensaje ?? "No se pudo finalizar la revisión");
-            }
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(NotificationSeverity.Error, "Error",
-                $"Error al finalizar revisión: {ex.Message}");
         }
     }
 

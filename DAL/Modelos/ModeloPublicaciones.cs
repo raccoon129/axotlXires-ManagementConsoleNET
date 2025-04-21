@@ -51,9 +51,6 @@ namespace DAL.Modelos
     /// <summary>
     /// Información básica de una publicación pendiente de revisión
     /// </summary>
-    /// <summary>
-    /// Información básica de una publicación pendiente de revisión
-    /// </summary>
     public class PublicacionPendiente
     {
         [JsonPropertyName("id_publicacion")]
@@ -225,50 +222,23 @@ namespace DAL.Modelos
     }
 
     /// <summary>
-    /// Información de un tipo de revisión
+    /// Información de un detalle de revisión (antes llamado tipo de revisión)
     /// </summary>
     public class TipoRevision
     {
         [JsonPropertyName("id_detalle_revision")]
-        public int IdTipoRevision { get; set; }
+        public int IdDetalleRevision { get; set; }
 
         [JsonPropertyName("detalle_revision")]
-        public string Nombre { get; set; }
+        public string DetalleRevision { get; set; }
 
         [JsonPropertyName("descripcion_revision")]
-        public string Descripcion { get; set; }
+        public string DescripcionRevision { get; set; }
     }
+
     #endregion
 
     #region Modelos para operaciones de revisión
-
-    /// <summary>
-    /// Modelo para iniciar una revisión
-    /// </summary>
-    public class IniciarRevision
-    {
-        [JsonPropertyName("id_tipo_revision")]
-        public int IdTipoRevision { get; set; }
-
-        [JsonPropertyName("comentario_inicial")]
-        public string ComentarioInicial { get; set; }
-    }
-
-    /// <summary>
-    /// Modelo para finalizar una revisión
-    /// </summary>
-    public class FinalizarRevision
-    {
-        /// <summary>
-        /// Decisión: "aprobar", "solicitar_cambios" o "rechazar"
-        /// </summary>
-        public string Decision { get; set; }
-
-        /// <summary>
-        /// Comentario detallado de retroalimentación para el autor
-        /// </summary>
-        public string Comentario { get; set; }
-    }
 
     /// <summary>
     /// Modelo para agregar un comentario a una revisión
@@ -279,39 +249,80 @@ namespace DAL.Modelos
     }
 
     /// <summary>
-    /// Respuesta al crear una revisión
+    /// Modelo para el proceso unificado de revisión
     /// </summary>
-    public class RespuestaCreacionRevision
+    public class ProcesoRevision
     {
-        public string Status { get; set; }
-        public string Mensaje { get; set; }
-        public DatosRevisionCreada Datos { get; set; }
+        /// <summary>
+        /// Detalle de la revisión (nombre/tipo)
+        /// </summary>
+        [JsonPropertyName("detalle_revision")]
+        public string DetalleRevision { get; set; }
+
+        /// <summary>
+        /// Descripción de la revisión
+        /// </summary>
+        [JsonPropertyName("descripcion_revision")]
+        public string DescripcionRevision { get; set; }
+
+        /// <summary>
+        /// Comentario de retroalimentación
+        /// </summary>
+        public string Comentario { get; set; }
+
+        /// <summary>
+        /// Decisión tomada: "aprobar", "solicitar_cambios" o "rechazar"
+        /// </summary>
+        public string Decision { get; set; }
     }
 
     /// <summary>
-    /// Datos de la revisión creada
+    /// Respuesta al ejecutar el proceso unificado de revisión
     /// </summary>
-    public class DatosRevisionCreada
+    public class RespuestaProcesoRevision
     {
+        /// <summary>
+        /// Estado de la respuesta: "success" o "error"
+        /// </summary>
+        public string Status { get; set; }
+
+        /// <summary>
+        /// Mensaje descriptivo del resultado
+        /// </summary>
+        public string Mensaje { get; set; }
+
+        /// <summary>
+        /// Datos del resultado del proceso
+        /// </summary>
+        public DatosProcesoRevision Datos { get; set; }
+    }
+
+    /// <summary>
+    /// Datos del resultado del proceso de revisión
+    /// </summary>
+    public class DatosProcesoRevision
+    {
+        /// <summary>
+        /// ID de la revisión creada
+        /// </summary>
         [JsonPropertyName("id_revision")]
         public int IdRevision { get; set; }
-    }
 
-    /// <summary>
-    /// Respuesta al finalizar una revisión
-    /// </summary>
-    public class RespuestaFinalizacionRevision
-    {
-        public string Status { get; set; }
-        public string Mensaje { get; set; }
-        public DatosRevisionFinalizada Datos { get; set; }
-    }
+        /// <summary>
+        /// Detalle de la revisión
+        /// </summary>
+        [JsonPropertyName("detalle_revision")]
+        public string DetalleRevision { get; set; }
 
-    /// <summary>
-    /// Datos después de finalizar una revisión
-    /// </summary>
-    public class DatosRevisionFinalizada
-    {
+        /// <summary>
+        /// Descripción de la revisión
+        /// </summary>
+        [JsonPropertyName("descripcion_revision")]
+        public string DescripcionRevision { get; set; }
+
+        /// <summary>
+        /// Nuevo estado de la publicación tras la revisión
+        /// </summary>
         [JsonPropertyName("nuevo_estado")]
         public string NuevoEstado { get; set; }
     }
@@ -334,22 +345,6 @@ namespace DAL.Modelos
         [JsonPropertyName("id_comentario")]
         public int IdComentario { get; set; }
     }
-
-    /// <summary>
-    /// Modelo para iniciar una revisión con tipo y descripción personalizados
-    /// </summary>
-    public class IniciarRevisionCustom
-    {
-        [JsonPropertyName("tipo_revision")]
-        public string TipoRevision { get; set; }
-
-        [JsonPropertyName("descripcion_revision")]
-        public string DescripcionRevision { get; set; }
-
-        [JsonPropertyName("comentario_inicial")]
-        public string ComentarioInicial { get; set; }
-    }
-
 
     #endregion
 

@@ -20,13 +20,18 @@ namespace DAL
         /// Almacena el password para el uso de la API
         /// </summary>
         internal static string JWTPassword = "5jedasD&*Zetk9SmRRwCX";
+#if DEBUG
         /// <summary>
         /// Almacena la URI de la API
         /// </summary>
         internal static string ApiBaseAddress = @"http://localhost:3001";
-
         public static string UrlBaseApi { get; set; } = "http://localhost:3001";
         public static string Flipbook { get; set; } = "http://localhost:3002";
+#else
 
+        internal static string ApiBaseAddress = @"https://axotlxires-api.onrender.com";
+        public static string UrlBaseApi { get; set; } = "https://axotlxires-api.onrender.com";
+        public static string Flipbook { get; set; } = "http://localhost:3002";
+#endif
     }
 }
