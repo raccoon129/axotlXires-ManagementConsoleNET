@@ -32,11 +32,36 @@
             @if (estaAutenticado)
             {
                 <div class="menu-navbar">
-                    <!-- Notificaciones -->
-                    <button class="boton-notificacion-navbar">
-                        <i class="fa fa-bell"></i>
-                        <span class="indicador-notificacion"></span>
-                    </button>
+                    <!-- Nuevo ícono de cuadrícula (grid) con contenedor para igualar tamaño al avatar -->
+                    <div class="menu-grid-navbar">
+                        <button @onclick="AlternarMenuGrid" class="boton-grid-navbar">
+                            <div class="icono-grid-container">
+                                <RadzenIcon Icon="apps" Style="font-size: 1.75rem;" />
+                            </div>
+                        </button>
+
+                        <!-- Menú desplegable de apps (reposicionado) -->
+                        @if (mostrarMenuGrid)
+                        {
+                            <div class="desplegable-grid-navbar">
+                                <h4 class="titulo-desplegable">Ecosistema Xires</h4>
+                                <div class="grid-iconos">
+                                    <a href="https://axotl.org" target="_blank" class="icono-app">
+                                        <img src="/img/IconCabezaAjoloteDark.png" alt="Axotl Xires" />
+                                        <span>Axotl Xires</span>
+                                    </a>
+                                    <a href="https://team.management.axotl.org" target="_blank" class="icono-app">
+                                        <img src="/img/IconAxotlXiresAzul.png" alt="Management Console" />
+                                        <span>Management Console</span>
+                                    </a>
+                                    <a href="https://team.api.axotl.org" target="_blank" class="icono-app">
+                                        <img src="/img/IconCabezaAjoloteWhite.png" alt="API" />
+                                        <span>API</span>
+                                    </a>
+                                </div>
+                            </div>
+                        }
+                    </div>
 
                     <!-- Menú de usuario -->
                     <div class="menu-usuario-navbar">
@@ -160,28 +185,91 @@
         gap: 1rem;
     }
 
-    .boton-notificacion-navbar {
+    /* Estilos para el botón de grid y su contenedor */
+    .menu-grid-navbar {
+        position: relative;
+    }
+
+    .boton-grid-navbar {
         padding: 0.5rem;
         border-radius: 9999px;
         border: none;
         background: transparent;
-        position: relative;
         cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
     }
 
-        .boton-notificacion-navbar:hover {
+        .boton-grid-navbar:hover {
             background-color: #f3f4f6;
         }
 
-    .indicador-notificacion {
-        position: absolute;
-        top: 0.25rem;
-        right: 0.25rem;
-        height: 0.5rem;
-        width: 0.5rem;
-        background-color: #ef4444;
+    /* Contenedor circular para igualar tamaño con el avatar */
+    .icono-grid-container {
+        width: 1rem;
+        height: 1rem;
         border-radius: 9999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
+
+    /* Estilos para el desplegable de grid */
+    .desplegable-grid-navbar {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 0.5rem);
+        width: 280px;
+        background-color: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e5e7eb;
+        padding: 1rem;
+        z-index: 10;
+    }
+
+    .titulo-desplegable {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .grid-iconos {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.75rem;
+    }
+
+    .icono-app {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 0.75rem;
+        border-radius: 0.5rem;
+        text-decoration: none;
+        transition: background-color 0.2s;
+    }
+
+        .icono-app:hover {
+            background-color: #f3f4f6;
+        }
+
+        .icono-app img {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            margin-bottom: 0.5rem;
+        }
+
+        .icono-app span {
+            font-size: 0.75rem;
+            color: #374151;
+            text-align: center;
+        }
 
     .menu-usuario-navbar {
         position: relative;
@@ -262,12 +350,19 @@
 </style>
 
 @code {
+    // El resto del código permanece igual
     private bool mostrarMenuUsuario = false;
+    private bool mostrarMenuGrid = false;
     private bool estaAutenticado = false;
     private string nombreUsuario = string.Empty;
     private int usuarioId = 0;
     private string imagenPerfilBase64;
 
+    /* URLs para las aplicaciones
+    private string urlAxotlXires = "https://axotl-xires-url.com";
+    private string urlManagementConsole = "https://management-console-url.com";
+    private string urlApi = "https://api-docs-url.com";
+    */
     // Instancia del servicio para consultar imágenes
     private readonly consultarImagenes _servicioImagenes = new consultarImagenes();
 
@@ -350,9 +445,29 @@
         }
     }
 
+    /// <summary>
+    /// Alterna la visibilidad del menú grid de aplicaciones
+    /// </summary>
+    private void AlternarMenuGrid()
+    {
+        mostrarMenuGrid = !mostrarMenuGrid;
+
+        // Cerrar el otro menú si está abierto
+        if (mostrarMenuGrid && mostrarMenuUsuario)
+        {
+            mostrarMenuUsuario = false;
+        }
+    }
+
     private void AlternarMenuUsuario()
     {
         mostrarMenuUsuario = !mostrarMenuUsuario;
+
+        // Cerrar el otro menú si está abierto
+        if (mostrarMenuUsuario && mostrarMenuGrid)
+        {
+            mostrarMenuGrid = false;
+        }
     }
 
     private async Task CerrarSesion()
@@ -372,5 +487,14 @@
         {
             Console.WriteLine($"Error al cerrar sesión: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Cierra los menús al hacer clic fuera de ellos
+    /// </summary>
+    private async Task CerrarMenusAlClickFuera()
+    {
+        // Agregar un script para manejar clics fuera de los menús
+        await JSRuntime.InvokeVoidAsync("document.addEventListener", "click", DotNetObjectReference.Create(this));
     }
 }
